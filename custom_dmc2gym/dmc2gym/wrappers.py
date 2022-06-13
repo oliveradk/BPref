@@ -17,14 +17,18 @@ def _spec_to_box(spec):
             return s.minimum + zeros, s.maximum + zeros
 
     mins, maxs = [], []
+    dtype = None
     for s in spec:
+        if dtype is None:
+            dtype = s.dtype 
         mn, mx = extract_min_max(s)
         mins.append(mn)
         maxs.append(mx)
+
     low = np.concatenate(mins, axis=0)
     high = np.concatenate(maxs, axis=0)
     assert low.shape == high.shape
-    return spaces.Box(low, high, dtype=np.float32)
+    return spaces.Box(low, high, dtype=dtype)
 
 def _spec_to_box_manipulation(spec):
     def extract_min_max(s):
@@ -38,7 +42,10 @@ def _spec_to_box_manipulation(spec):
             return s.minimum + zeros, s.maximum + zeros
 
     mins, maxs = [], []
+    dtype = None
     for s in spec:
+        if dtype is None:
+            dtype = s.dtype
         if 'front_close' not in s.name:
             mn, mx = extract_min_max(s)
             mins.append(mn)
@@ -46,7 +53,7 @@ def _spec_to_box_manipulation(spec):
     low = np.concatenate(mins, axis=0)
     high = np.concatenate(maxs, axis=0)
     assert low.shape == high.shape
-    return spaces.Box(low, high, dtype=np.float32)
+    return spaces.Box(low, high, dtype=dtype)
 
 
 def _flatten_obs(obs):
@@ -176,12 +183,11 @@ class Custom_DMCWrapper(core.Env):
 
     
     def _convert_action(self, action):
-        action = action.astype(np.float64)
+        action = action.astype(self._true_action_space.dtype)
         true_delta = self._true_action_space.high - self._true_action_space.low
         norm_delta = self._norm_action_space.high - self._norm_action_space.low
         action = (action - self._norm_action_space.low) / norm_delta
         action = action * true_delta + self._true_action_space.low
-        action = action.astype(np.float32)
         return action
 
     @property
@@ -229,7 +235,7 @@ class Custom_DMCWrapper(core.Env):
         else:
             self.current_state = _flatten_obs(time_step.observation)
         obs = self._get_obs(time_step)
-        return obs
+        return obs 
 
     def render(self, mode='rgb_array', height=None, width=None, camera_id=0):
         assert mode == 'rgb_array', 'only support rgb_array mode, given %s' % mode
