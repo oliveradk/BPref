@@ -127,15 +127,6 @@ class RewardModel:
         self.best_action = []
         self.large_batch = large_batch
         
-        # new teacher
-        self.teacher_beta = teacher_beta
-        self.teacher_gamma = teacher_gamma
-        self.teacher_eps_mistake = teacher_eps_mistake
-        self.teacher_eps_equal = teacher_eps_equal
-        self.teacher_eps_skip = teacher_eps_skip
-        self.teacher_thres_skip = 0
-        self.teacher_thres_equal = 0
-        
         self.label_margin = label_margin
         self.label_target = 1 - 2*self.label_margin
     
@@ -148,12 +139,6 @@ class RewardModel:
     
     def set_batch(self, new_batch):
         self.mb_size = int(new_batch)
-        
-    def set_teacher_thres_skip(self, new_margin):
-        self.teacher_thres_skip = new_margin * self.teacher_eps_skip
-        
-    def set_teacher_thres_equal(self, new_margin):
-        self.teacher_thres_equal = new_margin * self.teacher_eps_equal
         
     def construct_ensemble(self):
         for i in range(self.de):
@@ -369,58 +354,6 @@ class RewardModel:
             np.copyto(self.buffer_label[self.buffer_index:next_index], labels)
             self.buffer_index = next_index
             
-    def get_label(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
-        sum_r_t_1 = np.sum(r_t_1, axis=1)
-        sum_r_t_2 = np.sum(r_t_2, axis=1)
-        
-        # skip the query
-        if self.teacher_thres_skip > 0: 
-            max_r_t = np.maximum(sum_r_t_1, sum_r_t_2)
-            max_index = (max_r_t > self.teacher_thres_skip).reshape(-1)
-            if sum(max_index) == 0:
-                return None, None, None, None, []
-
-            sa_t_1 = sa_t_1[max_index]
-            sa_t_2 = sa_t_2[max_index]
-            r_t_1 = r_t_1[max_index]
-            r_t_2 = r_t_2[max_index]
-            sum_r_t_1 = np.sum(r_t_1, axis=1)
-            sum_r_t_2 = np.sum(r_t_2, axis=1)
-        
-        # equally preferable
-        margin_index = (np.abs(sum_r_t_1 - sum_r_t_2) < self.teacher_thres_equal).reshape(-1)
-        
-        # perfectly rational
-        seg_size = r_t_1.shape[1]
-        temp_r_t_1 = r_t_1.copy()
-        temp_r_t_2 = r_t_2.copy()
-        for index in range(seg_size-1):
-            temp_r_t_1[:,:index+1] *= self.teacher_gamma
-            temp_r_t_2[:,:index+1] *= self.teacher_gamma
-        sum_r_t_1 = np.sum(temp_r_t_1, axis=1)
-        sum_r_t_2 = np.sum(temp_r_t_2, axis=1)
-            
-        rational_labels = 1*(sum_r_t_1 < sum_r_t_2)
-        if self.teacher_beta > 0: # Bradley-Terry rational model
-            r_hat = torch.cat([torch.Tensor(sum_r_t_1), 
-                               torch.Tensor(sum_r_t_2)], axis=-1)
-            r_hat = r_hat*self.teacher_beta
-            ent = F.softmax(r_hat, dim=-1)[:, 1]
-            labels = torch.bernoulli(ent).int().numpy().reshape(-1, 1)
-        else:
-            labels = rational_labels
-        
-        # making a mistake
-        len_labels = labels.shape[0]
-        rand_num = np.random.rand(len_labels)
-        noise_index = rand_num <= self.teacher_eps_mistake
-        labels[noise_index] = 1 - labels[noise_index]
- 
-        # equally preferable
-        labels[margin_index] = -1 
-        
-        return sa_t_1, sa_t_2, r_t_1, r_t_2, labels
-    
     def kcenter_sampling(self):
         
         # get queries
@@ -446,14 +379,7 @@ class RewardModel:
         r_t_1, sa_t_1 = r_t_1[selected_index], sa_t_1[selected_index]
         r_t_2, sa_t_2 = r_t_2[selected_index], sa_t_2[selected_index]
         
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(
-            sa_t_1, sa_t_2, r_t_1, r_t_2)
-        
-        if len(labels) > 0:
-            self.put_queries(sa_t_1, sa_t_2, labels)
-        
-        return len(labels)
+        return sa_t_1, sa_t_2, r_t_1, r_t_2
     
     def kcenter_disagree_sampling(self):
         
@@ -489,14 +415,7 @@ class RewardModel:
         r_t_1, sa_t_1 = r_t_1[selected_index], sa_t_1[selected_index]
         r_t_2, sa_t_2 = r_t_2[selected_index], sa_t_2[selected_index]
 
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(
-            sa_t_1, sa_t_2, r_t_1, r_t_2)
-        
-        if len(labels) > 0:
-            self.put_queries(sa_t_1, sa_t_2, labels)
-        
-        return len(labels)
+        return sa_t_1, sa_t_2, r_t_1, r_t_2
     
     def kcenter_entropy_sampling(self):
         
@@ -532,29 +451,14 @@ class RewardModel:
         
         r_t_1, sa_t_1 = r_t_1[selected_index], sa_t_1[selected_index]
         r_t_2, sa_t_2 = r_t_2[selected_index], sa_t_2[selected_index]
-
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(
-            sa_t_1, sa_t_2, r_t_1, r_t_2)
-        
-        if len(labels) > 0:
-            self.put_queries(sa_t_1, sa_t_2, labels)
-        
-        return len(labels)
+        return sa_t_1, sa_t_2, r_t_1, r_t_2
     
     def uniform_sampling(self):
         # get queries
         sa_t_1, sa_t_2, r_t_1, r_t_2 =  self.get_queries(
             mb_size=self.mb_size)
-            
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(
-            sa_t_1, sa_t_2, r_t_1, r_t_2)
-        
-        if len(labels) > 0:
-            self.put_queries(sa_t_1, sa_t_2, labels)
-        
-        return len(labels)
+
+        return sa_t_1, sa_t_2, r_t_1, r_t_2    
     
     def disagreement_sampling(self):
         
@@ -568,13 +472,7 @@ class RewardModel:
         r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
         r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]        
         
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(
-            sa_t_1, sa_t_2, r_t_1, r_t_2)        
-        if len(labels) > 0:
-            self.put_queries(sa_t_1, sa_t_2, labels)
-        
-        return len(labels)
+        return sa_t_1, sa_t_2, r_t_1, r_t_2
     
     def entropy_sampling(self):
         
@@ -589,14 +487,7 @@ class RewardModel:
         r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
         r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
         
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(    
-            sa_t_1, sa_t_2, r_t_1, r_t_2)
-        
-        if len(labels) > 0:
-            self.put_queries(sa_t_1, sa_t_2, labels)
-        
-        return len(labels)
+        return sa_t_1, sa_t_2, r_t_1, r_t_2
     
     def train_reward(self):
         ensemble_losses = [[] for _ in range(self.de)]
