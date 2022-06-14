@@ -11,9 +11,11 @@ import time
 import pickle as pkl
 import utils
 import hydra
+from pyvirtualdisplay import Display
 
 from logger import Logger
 from replay_buffer import ReplayBuffer
+
 
 class Workspace(object):
     def __init__(self, cfg):
@@ -185,4 +187,5 @@ def main(cfg):
     workspace.run()
 
 if __name__ == '__main__':
-    main()
+    with Display(backend='xvfb') as disp:
+        main()

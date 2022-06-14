@@ -11,14 +11,15 @@ import time
 import pickle as pkl
 import tqdm
 from collections import deque
+from pyvirtualdisplay import Display
+import hydra
 
 from logger import Logger
 from replay_buffer import ReplayBuffer
 from reward_model import RewardModel
 from teacher import Teachers, Teacher
-
 import utils
-import hydra
+
 
 class Workspace(object):
     def __init__(self, cfg):
@@ -337,4 +338,5 @@ def main(cfg):
     workspace.run()
 
 if __name__ == '__main__':
+    with Display(backend='xvfb') as disp:
         main()  
