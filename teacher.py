@@ -7,12 +7,14 @@ import torch.functional as F
 
 class Teacher():
     def __init__(self,
+        env,
         beta=-1, 
         gamma=1,
         eps_mistake=0, 
         eps_skip=0,
         eps_equal=0
     ):
+        self.env = env
         self.beta = beta
         self.gamma = gamma
         self.eps_mistake = eps_mistake

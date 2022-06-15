@@ -79,6 +79,7 @@ class Workspace(object):
         
         self.teachers = Teachers(
             [Teacher(
+                env=self.env,
                 beta=cfg.teacher_beta,
                 gamma=cfg.teacher_gamma,
                 eps_mistake=cfg.teacher_eps_mistake,
