@@ -31,12 +31,14 @@ class Workspace(object):
 
         self.device = torch.device(cfg.device)
         self.log_success = False
+        self.log_info = False
         self.step = 0
         
         # make env
         if 'metaworld' in cfg.env:
             self.env = utils.make_metaworld_env(cfg)
             self.log_success = True
+            self.log_info = True
         else:
             self.env = utils.make_env(cfg)
 
@@ -61,7 +63,15 @@ class Workspace(object):
         average_episode_reward = 0
         if self.log_success:
             success_rate = 0
-            
+        if self.log_info:
+            avg_env_info = {}
+            sample_action = self.env.action_space.sample()
+            obs = self.env.reset()
+            _, env_info = self.env.evaluate_state(obs, sample_action)
+            for key in env_info.keys():
+                avg_env_info[key] = 0.0
+
+
         for episode in range(self.cfg.num_eval_episodes):
             obs = self.env.reset()
             self.agent.reset()
@@ -78,6 +88,10 @@ class Workspace(object):
                 episode_reward += reward
                 if self.log_success:
                     episode_success = max(episode_success, extra['success'])
+                if self.log_info:
+                    _, env_info = self.env.evaluate_state(obs, action)
+                    for key, value in env_info.items():
+                        avg_env_info[key] += value 
 
             average_episode_reward += episode_reward
             if self.log_success:
@@ -87,6 +101,9 @@ class Workspace(object):
         if self.log_success:
             success_rate /= self.cfg.num_eval_episodes
             success_rate *= 100.0
+        if self.log_info:
+            for key in avg_env_info.keys():
+                avg_env_info[key] /= self.cfg.num_eval_episodes
 
         self.logger.log('eval/episode_reward', average_episode_reward,
                         self.step)
@@ -94,12 +111,22 @@ class Workspace(object):
         if self.log_success:
             self.logger.log('eval/success_rate', success_rate,
                         self.step)
+        if self.log_info:
+            for key, value in avg_env_info.items():
+                self.logger.log(f'eval/avg_{key}', value, self.step)
         self.logger.dump(self.step)
         
     def run(self):
         episode, episode_reward, done = 0, 0, True
         if self.log_success:
             episode_success = 0
+        if self.log_info:
+            sum_env_info = {}
+            sample_obs = self.env.reset()
+            sample_action = self.env.action_space.sample()
+            _, env_info = self.env.evaluate_state(sample_obs, sample_action)
+            for key in env_info.keys():
+                sum_env_info[key] = 0.0
         start_time = time.time()
         fixed_start_time = time.time()
         
@@ -125,6 +152,10 @@ class Workspace(object):
                 if self.log_success:
                     self.logger.log('train/episode_success', episode_success,
                         self.step)
+                if self.log_info:
+                    for key, value in sum_env_info.items():
+                        self.logger.log(f'train/sum_{key}', value, self.step)
+                
                             
                 obs = self.env.reset()
                 self.agent.reset()
@@ -132,6 +163,9 @@ class Workspace(object):
                 episode_reward = 0
                 if self.log_success:
                     episode_success = 0
+                if self.log_info:
+                    for key in sum_env_info.keys():
+                        sum_env_info[key] = 0.0
                 episode_step = 0
                 episode += 1
 
@@ -169,6 +203,11 @@ class Workspace(object):
             
             if self.log_success:
                 episode_success = max(episode_success, extra['success'])
+            
+            if self.log_info:
+                _, env_info = self.env.evaluate_state(obs, action) 
+                for key, value in env_info.items():
+                    sum_env_info[key] += value
                 
             self.replay_buffer.add(
                 obs, action, 
