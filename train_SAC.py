@@ -71,7 +71,9 @@ class Workspace(object):
             for key in env_info.keys():
                 avg_env_info[key] = 0.0
 
-
+        if self.cfg.log_episode:
+            utils.log_episode(self.env, self.agent, self.logger._sw, f'step_{self.step}')
+        
         for episode in range(self.cfg.num_eval_episodes):
             obs = self.env.reset()
             self.agent.reset()

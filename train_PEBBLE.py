@@ -94,9 +94,13 @@ class Workspace(object):
         if self.log_info:
             avg_env_info = {}
             sample_action = self.env.action_space.sample()
+            obs = self.env.reset()
             _, env_info = self.env.evaluate_state(obs, sample_action)
             for key in env_info.keys():
                 avg_env_info[key] = 0.0
+        
+        if self.cfg.log_episode:
+            utils.log_episode(self.env, self.agent, self.logger._sw, f'step_{self.step}')
         
         for episode in range(self.cfg.num_eval_episodes):
             obs = self.env.reset()

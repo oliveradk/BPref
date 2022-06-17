@@ -266,3 +266,28 @@ def to_np(t):
         return np.array([])
     else:
         return t.cpu().detach().numpy()
+
+
+def log_episode(env, agent, writer, tag, log_video=True, log_info=True):
+    done = False
+    obs = env.reset()
+    agent.reset()
+
+    frames = []
+    step=0
+    while not done:
+        if log_video:
+            frame = env.render(offscreen=True)
+            frames.append(frame)
+        with eval_mode(agent):
+            action = agent.act(obs, sample=False)
+        obs, _reward, done, info = env.step(action)
+        if log_info:
+            for key, value in info.items():
+                writer.add_scalar(f'{tag}/{key}', value, step)
+        step += 1
+    if log_video:
+        frames = torch.from_numpy(np.array(frames))
+        frames = frames.unsqueeze(0)
+        frames = frames.permute(0, 1, 4, 2, 3)
+        writer.add_video(f'{tag}/video', frames, step, fps=30)

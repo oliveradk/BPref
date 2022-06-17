@@ -35,6 +35,7 @@ replay_buffer_capacity: ${num_train_steps}
 # evaluation config
 eval_frequency: 10000
 num_eval_episodes: 10
+log_episode: false
 device: cuda
 
 # logger

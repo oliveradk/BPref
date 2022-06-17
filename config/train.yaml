@@ -24,6 +24,7 @@ reset_update: 100
 # logger
 log_frequency: 10000
 log_save_tb: true
+log_episode: false
 
 # video recorder
 save_video: false
