@@ -55,3 +55,4 @@ figures
 *.txt
 figure/
 data/
+saved_objs/
