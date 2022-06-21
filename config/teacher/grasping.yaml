@@ -1,0 +1,19 @@
+teacher:
+  name: grasping
+  class: teacher.grasp.GraspingTeachers
+  params:
+        grasp_thresh: 0.5
+        ds: ???
+        da: ???
+        g_beta_1: 1
+        g_beta_2: 0.5
+        g_gamma: 1
+        g_eps_mistake: 0
+        g_eps_skip: 0
+        g_eps_equal: 0
+        ng_beta_1: 1
+        ng_beta_2: 0.5
+        ng_gamma: 1
+        ng_eps_mistake: 0
+        ng_eps_skip: 0
+        ng_eps_equal: 0

@@ -1,6 +1,7 @@
 defaults:
     - agent: sac
-    
+    - teacher: standard
+
 # this needs to be specified manually
 experiment: PEBBLE
 

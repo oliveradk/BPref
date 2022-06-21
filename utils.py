@@ -291,3 +291,16 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True):
         frames = frames.unsqueeze(0)
         frames = frames.permute(0, 1, 4, 2, 3)
         writer.add_video(f'{tag}/video', frames, step, fps=30)
+
+def get_info(sa_t, env, keys, ds, da):
+    info_dicts = []
+    for query in sa_t[:]:
+        info_dict = {key: [] for key in keys}
+        for frame in query[:]:
+            obs = frame[:ds]
+            action = frame[ds:]
+            _reward, info = env.evaluate_state(obs, action)
+            for key in keys:
+                info_dict[key].append(info[key])
+        info_dicts.append(info_dict)
+    return info_dicts

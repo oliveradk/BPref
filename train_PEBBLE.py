@@ -77,15 +77,11 @@ class Workspace(object):
             large_batch=cfg.large_batch, 
             label_margin=cfg.label_margin)
         
-        self.teachers = Teachers(
-            [Teacher(
-                env=self.env,
-                beta=cfg.teacher_beta,
-                gamma=cfg.teacher_gamma,
-                eps_mistake=cfg.teacher_eps_mistake,
-                eps_skip=cfg.teacher_eps_skip,
-                eps_equal=cfg.teacher_eps_equal)]
-        )
+        #instantiate the teaches
+        cfg.teacher.params.ds = self.env.observation_space.shape[0]
+        cfg.teacher.params.da = self.env.action_space.shape[0]
+        self.teachers = hydra.utils.instantiate(cfg.teacher)
+        self.teachers.set_env(self.env)
         
     def evaluate(self):
         average_episode_reward = 0
@@ -177,7 +173,11 @@ class Workspace(object):
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2 = queries
-        
+        save_dir = '/home/danielskoch/BPref/saved_objs'
+        # np.save(os.path.join(save_dir, 'sa_t_1'), sa_t_1)
+        # np.save(os.path.join(save_dir, 'sa_t_2'), sa_t_2)
+        # np.save(os.path.join(save_dir, 'r_t_1'), r_t_1)
+        # np.save(os.path.join(save_dir, 'r_t_2'), r_t_2)
         # get teacher
         teacher = self.teachers.uniform_sampling(sa_t_1, sa_t_2)
         
@@ -376,7 +376,7 @@ class Workspace(object):
         self.agent.save(self.work_dir, self.step)
         self.reward_model.save(self.work_dir, self.step)
         
-@hydra.main(config_path='config/train_PEBBLE.yaml', strict=True)
+@hydra.main(config_path='config/train_PEBBLE.yaml')
 def main(cfg):
     workspace = Workspace(cfg)
     workspace.run()
