@@ -268,7 +268,7 @@ def to_np(t):
         return t.cpu().detach().numpy()
 
 
-def log_episode(env, agent, writer, tag, log_video=True, log_info=True):
+def log_episode(env, agent, writer, tag, log_video=True, log_info=True, teachers=None):
     done = False
     obs = env.reset()
     agent.reset()
@@ -286,6 +286,12 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True):
             for key, value in info.items():
                 writer.add_scalar(f'{tag}/{key}', value, step)
         step += 1
+
+        if teachers:
+            sa = np.concatenate((obs, action))[None, None,:]
+            for i, teacher in enumerate(teachers.teachers):
+                beta = teacher.get_betas(sa, sa)[0]
+                writer.add_scalar(f'{tag}/{type(teacher)}_{i}', beta, step)
     if log_video:
         frames = torch.from_numpy(np.array(frames))
         frames = frames.unsqueeze(0)
