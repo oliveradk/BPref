@@ -83,24 +83,18 @@ class GraspingTeachers(Teachers):
     def __init__(self,
         grasp_thresh,
         ds, 
-        da, 
-        g_beta_1, 
-        g_beta_2,
-        g_gamma,
-        g_eps_mistake,
-        g_eps_skip,
-        g_eps_equal,
-        ng_beta_1, 
-        ng_beta_2, 
-        ng_gamma, 
-        ng_eps_mistake,
-        ng_eps_skip,
-        ng_eps_equal
+        da,
+        beta_1,
+        beta_2,
+        gamma,
+        eps_mistake,
+        eps_skip,
+        eps_equal 
     ):
-        grasp_teacher = GraspTeacher(g_beta_1, g_beta_2, grasp_thresh, ds, da,
-            g_gamma, g_eps_mistake, g_eps_skip, g_eps_equal)
+        grasp_teacher = GraspTeacher(beta_1[0], beta_2[0], grasp_thresh, ds, da,
+        gamma[0], eps_mistake[0], eps_skip[0], eps_equal[0])
 
-        nongrasp_teacher = NonGraspTeacher(ng_beta_1, ng_beta_2, grasp_thresh, 
-            ds, da, ng_gamma, ng_eps_mistake, ng_eps_skip, ng_eps_equal)
+        nongrasp_teacher = NonGraspTeacher(beta_1[1], beta_2[1], grasp_thresh, 
+            ds, da, gamma[1], eps_mistake[1], eps_skip[1], eps_equal[1])
         
         super().__init__([grasp_teacher, nongrasp_teacher])

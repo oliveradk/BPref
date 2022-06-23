@@ -4,8 +4,8 @@ teacher:
   params:
     ds: ???
     da: ???
-    beta: 1
-    gamma: 1
-    eps_mistake: 0
-    eps_skip: 0
-    eps_equal: 0
+    beta: [1]
+    gamma: [1]
+    eps_mistake: [0]
+    eps_skip: [0]
+    eps_equal: [0]

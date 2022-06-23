@@ -32,6 +32,9 @@ class StandardTeachers(Teachers):
         eps_skip,
         eps_equal
     ):
-        teachers = [StandardTeacher(beta, ds, da, gamma, eps_mistake, eps_skip,
-        eps_equal)]
+        n = len(beta)
+        teachers = []
+        for i in range(n):
+            teachers.append(StandardTeacher(beta[i], ds, da, gamma[i], 
+                            eps_mistake[i], eps_skip[i], eps_equal[i]))
         super().__init__(teachers)
