@@ -2,7 +2,7 @@ teacher:
   name: standard
   class: teacher.standard.StandardTeachers
   params:
-    ds: ??
+    ds: ???
     da: ???
     beta: 1
     gamma: 1
