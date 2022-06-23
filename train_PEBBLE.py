@@ -151,7 +151,7 @@ class Workspace(object):
                 self.logger.log(f'eval/avg_{key}', value, self.step)
         self.logger.dump(self.step)
     
-    def learn_reward(self, first_flag=0):       
+    def learn_reward(self, first_flag=0): 
         # get querries
         queries, noisy_queries = 0, 0
         if first_flag == 1:
@@ -195,7 +195,7 @@ class Workspace(object):
         if self.labeled_feedback > 0:
             # update reward
             for epoch in range(self.cfg.reward_update):
-                if self.cfg.label_margin > 0 or self.cfg.teacher_eps_equal > 0:
+                if self.cfg.label_margin > 0 or teacher.eps_equal > 0:
                     train_acc = self.reward_model.train_soft_reward()
                 else:
                     train_acc = self.reward_model.train_reward()
@@ -223,7 +223,6 @@ class Workspace(object):
         # store train returns of recent 10 episodes
         avg_train_true_return = deque([], maxlen=10) 
         start_time = time.time()
-
         interact_count = 0
         while self.step < self.cfg.num_train_steps:
             if done:
@@ -327,8 +326,8 @@ class Workspace(object):
                         
                         # update margin --> not necessary / will be updated soon
                         new_margin = np.mean(avg_train_true_return) * (self.cfg.segment / self.env._max_episode_steps)
-                        self.teachers.set_teacher_thres_skip(new_margin * self.cfg.teacher_eps_skip)
-                        self.teachers.set_teacher_thres_equal(new_margin * self.cfg.teacher_eps_equal)
+                        self.teachers.set_teacher_thres_skip(new_margin)
+                        self.teachers.set_teacher_thres_equal(new_margin)
                         
                         # corner case: new total feed > max feed
                         if self.reward_model.mb_size + self.total_feedback > self.cfg.max_feedback:
