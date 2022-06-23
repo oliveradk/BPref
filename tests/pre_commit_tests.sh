@@ -1,5 +1,5 @@
 #!/bin/sh
-. ./tests/run_PEBBLE_metaworld.sh
+. ./tests/run_PEBBLE_metaworld_grasp.sh
 if [ $? -eq 0 ]; then
      echo "PEBBLE metaworld succeeded"
 else
