@@ -1,7 +1,6 @@
 #!/bin/sh
 . ./tests/run_PEBBLE_metaworld.sh
-if (($? == 0)) 
-then
+if [ $? -eq 0 ]; then
      echo "PEBBLE metaworld succeeded"
 else
     echo "PEBBLE metaworld failed"
@@ -9,8 +8,7 @@ else
 fi
 
 . ./tests/run_PEBBLE_dmc.sh
-if (($? == 0))
-then 
+if [ $? -eq 0 ]; then 
     echo "PEBBLE dmc succeeded" 
 else
     echo "PEBBLE dmc failed" 
@@ -18,8 +16,7 @@ else
 fi 
 
 . ./tests/run_sac_metaworld.sh
-if (($? == 0))
-then 
+if [ $? -eq 0 ]; then 
     echo "SAC metaworld succeeded" 
 else
     echo "SAC metaworld failed" 
@@ -27,8 +24,7 @@ else
 fi 
 
 . ./tests/run_sac_dmc.sh
-if (($? == 0))
-then 
+if [ $? -eq 0 ]; then 
     echo "SAC dmc succeeded" 
 else
     echo "SAC dmc failed" 
