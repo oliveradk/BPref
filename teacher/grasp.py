@@ -26,11 +26,11 @@ class GraspTeacher(Teacher):
         self.da = da
         
     def get_betas(self, sa_t_1, sa_t_2):
-        sa_1_info = utils.get_info(sa_t_1, self.env, ['grasp_reward'], self.ds, self.da)
-        sa_1_grasp_mean = np.array([np.mean(info_dict['grasp_reward']) for info_dict in sa_1_info])
+        sa_1_info = utils.get_info(sa_t_1, self.env, ['grasp_success'], self.ds, self.da)
+        sa_1_grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in sa_1_info])
 
-        sa_2_info = utils.get_info(sa_t_2, self.env, ['grasp_reward'], self.ds, self.da)
-        sa_2_grasp_mean = np.array([np.mean(info_dict['grasp_reward']) for info_dict in sa_2_info])
+        sa_2_info = utils.get_info(sa_t_2, self.env, ['grasp_success'], self.ds, self.da)
+        sa_2_grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in sa_2_info])
 
         grasp_mean = np.mean([sa_1_grasp_mean, sa_2_grasp_mean], axis=0)
 
@@ -63,11 +63,11 @@ class NonGraspTeacher(Teacher):
         self.da = da
         
     def get_betas(self, sa_t_1, sa_t_2):
-        sa_1_info = utils.get_info(sa_t_1, self.env, ['grasp_reward'], self.ds, self.da)
-        sa_1_grasp_mean = np.array([np.mean(info_dict['grasp_reward']) for info_dict in sa_1_info])
+        sa_1_info = utils.get_info(sa_t_1, self.env, ['grasp_success'], self.ds, self.da)
+        sa_1_grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in sa_1_info])
 
-        sa_2_info = utils.get_info(sa_t_2, self.env, ['grasp_reward'], self.ds, self.da)
-        sa_2_grasp_mean = np.array([np.mean(info_dict['grasp_reward']) for info_dict in sa_2_info])
+        sa_2_info = utils.get_info(sa_t_2, self.env, ['grasp_success'], self.ds, self.da)
+        sa_2_grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in sa_2_info])
 
         grasp_mean = np.mean([sa_1_grasp_mean, sa_2_grasp_mean], axis=0)
 
