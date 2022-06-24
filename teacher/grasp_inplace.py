@@ -5,8 +5,6 @@ from teacher import Teacher, Teachers
 import utils
 
 
-
-
 class GraspOnlyTeacher(Teacher):
 
     def __init__(self,
@@ -23,8 +21,8 @@ class GraspOnlyTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_betas(self, sa_t_1, sa_t_2):
-        return np.ones((sa_t_1.shape[0], 1)) * self.beta
+    def get_beta(self, sa_t):
+        return np.ones((sa_t.shape[0], 1)) * self.beta
     
     def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
         grasp_r_t_1 = utils.get_partial_reward(sa_t_1, self.env, 'grasp_reward', self.ds, self.da)
@@ -47,8 +45,8 @@ class InPlaceOnlyTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_betas(self, sa_t_1, sa_t_2):
-        return np.ones((sa_t_1.shape[0], 1)) * self.beta
+    def get_beta(self, sa_t):
+        return np.ones((sa_t.shape[0], 1)) * self.beta
     
     def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
         grasp_r_t_1 = utils.get_partial_reward(sa_t_1, self.env, 'in_place_reward', self.ds, self.da)

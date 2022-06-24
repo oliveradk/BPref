@@ -290,7 +290,7 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True, teachers
         if teachers:
             sa = np.concatenate((obs, action))[None, None,:]
             for i, teacher in enumerate(teachers.teachers):
-                beta = teacher.get_betas(sa, sa)[0]
+                beta = teacher.get_beta(sa)[0]
                 writer.add_scalar(f'{tag}/{type(teacher)}_{i}', beta, step)
     if log_video:
         frames = torch.from_numpy(np.array(frames))

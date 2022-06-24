@@ -33,7 +33,7 @@ class Teacher():
     def set_thres_equal(self, new_margin):
         self.thres_equal = new_margin * self.eps_equal
     
-    def get_betas(self, sa_t_1, sa_t_2):
+    def get_beta(self, sa_t):
         raise NotImplementedError
     
     def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
@@ -74,10 +74,11 @@ class Teacher():
             
         
         # Bradley-Terry rational model #TODO: allow for -beta to be perfect rationality
-        betas = self.get_betas(sa_t_1, sa_t_2)
-        r_hat = torch.cat([torch.Tensor(sum_r_t_1), 
-                            torch.Tensor(sum_r_t_2)], axis=-1)
-        r_hat = r_hat*betas
+        beta_1 = self.get_beta(sa_t_1)
+        beta_2 = self.get_beta(sa_t_2)
+
+        r_hat = torch.cat([torch.Tensor(sum_r_t_1) * beta_1, 
+                            torch.Tensor(sum_r_t_2) * beta_2], axis=-1)
         ent = F.softmax(r_hat, dim=-1)[:, 1]
         labels = torch.bernoulli(ent).int().numpy().reshape(-1, 1)
         
