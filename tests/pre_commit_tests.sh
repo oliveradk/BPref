@@ -7,6 +7,14 @@ else
     exit 1
 fi
 
+. ./tests/run_PEBBLE_metaworld_grasp_inplace.sh
+if [ $? -eq 0 ]; then
+     echo "PEBBLE metaworld grasp_inplace succeeded"
+else
+    echo "PEBBLE metaworld grasp_inplace failed"
+    exit 1
+fi
+
 . ./tests/run_PEBBLE_dmc.sh
 if [ $? -eq 0 ]; then 
     echo "PEBBLE dmc succeeded" 

@@ -310,3 +310,10 @@ def get_info(sa_t, env, keys, ds, da):
                 info_dict[key].append(info[key])
         info_dicts.append(info_dict)
     return info_dicts
+
+def get_partial_reward(sa_t, env, reward_key, ds, da):
+    info = get_info(sa_t, env, [reward_key], ds, da)
+
+    rew = [el[reward_key] for el in info]
+
+    return np.array(rew)[:,:,None]

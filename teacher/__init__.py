@@ -35,8 +35,13 @@ class Teacher():
     
     def get_betas(self, sa_t_1, sa_t_2):
         raise NotImplementedError
+    
+    def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
+        return r_t_1, r_t_2
 
     def get_label(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
+        r_t_1, r_t_2 = self.process_reward(sa_t_1, sa_t_2, r_t_1, r_t_2)
+        
         sum_r_t_1 = np.sum(r_t_1, axis=1)
         sum_r_t_2 = np.sum(r_t_2, axis=1)
         
