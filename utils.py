@@ -268,7 +268,7 @@ def to_np(t):
         return t.cpu().detach().numpy()
 
 
-def log_episode(env, agent, writer, tag, log_video=True, log_info=True, teachers=None):
+def log_episode(env, agent, writer, tag, log_video=True, log_info=True, log_obs=False, teachers=None):
     done = False
     obs = env.reset()
     agent.reset()
@@ -287,6 +287,9 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True, teachers
                 writer.add_scalar(f'{tag}/{key}', value, step)
         step += 1
 
+        if log_obs:
+            for i, ob_val in enumerate(obs):
+                writer.add_scalar(f'obs/obs_{i}', ob_val, step)
         if teachers:
             sa = np.concatenate((obs, action))[None, None,:]
             for i, teacher in enumerate(teachers.teachers):
