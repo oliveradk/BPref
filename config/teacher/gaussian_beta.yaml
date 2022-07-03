@@ -1,0 +1,12 @@
+teacher:
+  name: gaussian_beta
+  class: teacher.gaussian_beta.GaussianBetaTeachers
+  params:
+        n_teachers: 5
+        ds: ???
+        da: ???
+        gamma: 1
+        eps_mistake: 0
+        eps_skip: 0
+        eps_equal: 0
+        width_divisor: 4

@@ -1,3 +1,5 @@
+import collections.abc
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -320,6 +322,19 @@ def get_partial_reward(sa_t, env, reward_key, ds, da):
     rew = [el[reward_key] for el in info]
 
     return np.array(rew)[:,:,None]
+
+def box_vol(box):
+    widths = box_widths(box)
+    return widths.prod()
+
+def box_widths(box):
+    return box.high - box.low
+
+def remove_duplicates(obs_space):
+    return obs_space[np.r_[0:18, 36:]]
+
+def strata_width(strata):
+    return [np.array(stratum[1]) - np.array(stratum[0]) for stratum in strata]
 
 def extend_param(param, n):
     if not isinstance(param, collections.abc.Sized):
