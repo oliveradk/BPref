@@ -1,16 +1,8 @@
-import collections.abc
-
 import numpy as np
 
 from teacher import Teacher, Teachers
 import utils
 
-def extend_param(param, n):
-    if not isinstance(param, collections.abc.Sized):
-        param = [param] * n
-    elif len(param) != n:
-        raise ValueError('number of params must match')
-    return param
 
 class RewardBetaTeacher(Teacher):
 
@@ -52,11 +44,11 @@ class RewardBetaTeachers(Teachers):
     ):
         self.reward_keys = reward_keys
         n = len(self.reward_keys)
-        beta_scale = extend_param(beta_scale, n)
-        gamma = extend_param(gamma, n)
-        eps_mistake = extend_param(eps_mistake, n)
-        eps_skip = extend_param(eps_skip, n)
-        eps_equal = extend_param(eps_equal, n)
+        beta_scale = utils.extend_param(beta_scale, n)
+        gamma = utils.extend_param(gamma, n)
+        eps_mistake = utils.extend_param(eps_mistake, n)
+        eps_skip = utils.extend_param(eps_skip, n)
+        eps_equal = utils.extend_param(eps_equal, n)
 
         teachers = []
         for i, reward_key in enumerate(reward_keys):
@@ -64,17 +56,3 @@ class RewardBetaTeachers(Teachers):
             gamma[i], eps_mistake[i], eps_skip[i], eps_equal[i])
             teachers.append(teacher)
         super().__init__(teachers)
-
-# class RewardBetaGraspInPlace(RewardBetaTeachers):
-
-#     def __init__(self,
-#         ds,
-#         da, 
-#         beta,
-#         gamma,
-#         eps_mistake,
-#         eps_skip,
-#         eps_equal
-#     ):
-#         super().__init__(['grasp_reward, in_place_reward'], ds, da, beta,
-#             gamma, eps_mistake, eps_skip, eps_equal)

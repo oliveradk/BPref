@@ -2,6 +2,8 @@ import numpy as np
 
 from teacher import Teacher, Teachers
 
+import utils
+
 
 class StandardTeacher(Teacher):
     
@@ -33,6 +35,11 @@ class StandardTeachers(Teachers):
         eps_equal
     ):
         n = len(beta)
+        gamma = utils.extend_param(gamma, n)
+        eps_mistake = utils.extend_param(eps_mistake, n)
+        eps_skip = utils.extend_param(eps_skip, n)
+        eps_equal = utils.extend_param(eps_equal, n)
+
         teachers = []
         for i in range(n):
             teachers.append(StandardTeacher(beta[i], ds, da, gamma[i], 

@@ -63,6 +63,12 @@ class GraspingInPlaceOnlyTeachers(Teachers):
         eps_skip,
         eps_equal 
     ):
+        n=2
+        gamma = utils.extend_param(gamma, n)
+        eps_mistake = utils.extend_param(eps_mistake, n)
+        eps_skip = utils.extend_param(eps_skip, n)
+        eps_equal = utils.extend_param(eps_equal, n)
+        
         grasp_teacher = GraspOnlyTeacher(ds, da, beta[0],
         gamma[0], eps_mistake[0], eps_skip[0], eps_equal[0])
 

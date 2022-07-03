@@ -320,3 +320,10 @@ def get_partial_reward(sa_t, env, reward_key, ds, da):
     rew = [el[reward_key] for el in info]
 
     return np.array(rew)[:,:,None]
+
+def extend_param(param, n):
+    if not isinstance(param, collections.abc.Sized):
+        param = [param] * n
+    elif len(param) != n:
+        raise ValueError('number of params must match')
+    return param
