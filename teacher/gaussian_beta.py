@@ -57,10 +57,12 @@ class GaussianBetaTeachers(Teachers):
         eps_mistake, 
         eps_skip,
         eps_equal,
-        width_divisor=2
+        width_divisor=2,
+        beta_scale=1
     ):
         self.n_teachers = n_teachers
         self.width_divisor = width_divisor
+        self.beta_scale = beta_scale
         self.params = {
             'ds': ds, 
             'da': da, 
@@ -73,6 +75,8 @@ class GaussianBetaTeachers(Teachers):
     def set_env(self, env):
         self.define_teachers(env.observation_space)
         super().set_env(env)
+    
+            
     
     def define_teachers(self, obs_space, duplicates=False):
             #preprocess environment space (remove duplicate and zero dimensions, normalize?)
@@ -88,7 +92,7 @@ class GaussianBetaTeachers(Teachers):
             #calculate strata width for each
             strata_widths = utils.strata_width(strata)
             
-            scale = vol/self.n_teachers
+            scale = self.beta_scale * vol/self.n_teachers
             for i in range(self.n_teachers):
                 beta_func = Gaussian(points[i], strata_widths[i]/self.width_divisor, scale)
                 teacher = GaussianBetaTeacher(
