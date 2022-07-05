@@ -23,6 +23,14 @@ else
     exit 1
 fi
 
+. ./tests/run_PEBBLE_metaworld_gaussian_beta.sh
+if [ $? -eq 0 ]; then
+     echo "PEBBLE metaworld gaussian"
+else
+    echo "PEBBLE metaworld gaussian"
+    exit 1
+fi
+
 . ./tests/run_PEBBLE_dmc.sh
 if [ $? -eq 0 ]; then 
     echo "PEBBLE dmc succeeded" 
