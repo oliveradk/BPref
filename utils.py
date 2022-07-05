@@ -342,3 +342,6 @@ def extend_param(param, n):
     elif len(param) != n:
         raise ValueError('number of params must match')
     return param
+
+def arr_to_list(arr):
+    return [float(el) for el in arr]

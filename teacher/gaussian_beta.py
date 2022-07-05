@@ -2,6 +2,7 @@ import numpy as np
 from diversipy.hycusampling import stratify_generalized, stratified_sampling
 from gym.spaces.box import Box
 from scipy.stats import multivariate_normal
+import json
 
 import utils
 from teacher import Teacher, Teachers
@@ -72,13 +73,13 @@ class GaussianBetaTeachers(Teachers):
             'eps_equal': utils.extend_param(eps_equal, self.n_teachers)}
         super().__init__(teachers=[]) # teachers constructed in set_env
     
-    def set_env(self, env):
-        self.define_teachers(env.observation_space)
+    def set_env(self, env, log_dir=None):
+        self.define_teachers(env.observation_space, log_dir=log_dir)
         super().set_env(env)
     
             
     
-    def define_teachers(self, obs_space, duplicates=False):
+    def define_teachers(self, obs_space, duplicates=False, log_dir=None):
             #preprocess environment space (remove duplicate and zero dimensions, normalize?)
             box, obs_mask = self._process_obs_space(obs_space, duplicates=duplicates)
             vol = utils.box_vol(box)
@@ -105,6 +106,19 @@ class GaussianBetaTeachers(Teachers):
                     eps_skip=self.params['eps_skip'][i],
                     eps_equal=self.params['eps_equal'][i])
                 self.teachers.append(teacher)
+            if log_dir:
+                self.log_teachers(log_dir) 
+
+    def log_teachers(self, log_dir):
+        teacher_list = []
+        for teacher in self.teachers:
+            teacher_list.append({
+                'center': utils.arr_to_list(teacher.beta_func.center), 
+                'width': utils.arr_to_list(teacher.beta_func.width),
+                'scale': float(teacher.beta_func.scale)})
+        with open(f'{log_dir}/teacher_data.json', 'w') as f:
+            f.write(json.dumps(teacher_list))
+
     
     def _process_obs_space(self, obs_space, duplicates):
         #remove duplicate dimensions

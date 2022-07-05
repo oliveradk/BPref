@@ -81,7 +81,8 @@ class Workspace(object):
         cfg.teacher.params.ds = self.env.observation_space.shape[0]
         cfg.teacher.params.da = self.env.action_space.shape[0]
         self.teachers = hydra.utils.instantiate(cfg.teacher)
-        self.teachers.set_env(self.env)
+        self.teachers.set_env(self.env, self.logger._log_dir)
+
         
     def evaluate(self):
         average_episode_reward = 0

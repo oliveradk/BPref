@@ -108,6 +108,6 @@ class Teachers():
         for teacher in self.teachers:
             teacher.set_thres_equal(new_margin)
     
-    def set_env(self, env):
+    def set_env(self, env, log_dir=None):
         for teacher in self.teachers:
             teacher.set_env(env)
