@@ -65,6 +65,7 @@ class PPO_REWARD(OnPolicyRewardAlgorithm):
     def __init__(
         self,
         reward_model,
+        teachers,
         policy: Union[str, Type[ActorCriticPolicy]],
         env: Union[GymEnv, str],
         learning_rate: Union[float, Schedule] = 3e-4,
@@ -102,6 +103,7 @@ class PPO_REWARD(OnPolicyRewardAlgorithm):
 
         super(PPO_REWARD, self).__init__(
             reward_model,
+            teachers,
             policy,
             env,
             learning_rate=learning_rate,

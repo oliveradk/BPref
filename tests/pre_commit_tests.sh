@@ -54,3 +54,11 @@ else
     echo "SAC dmc failed" 
     exit 1
 fi
+
+. ./tests/run_PrefPPO_dmc.sh
+if [ $? -eq 0 ]; then 
+    echo "PrefPPO dmc succeeded" 
+else
+    echo "PrefPPo dmc failed" 
+    exit 1
+fi

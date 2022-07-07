@@ -8,6 +8,8 @@ from stable_baselines3 import PPO_REWARD
 from stable_baselines3.ppo import MlpPolicy
 from stable_baselines3.common.env_util import make_vec_dmcontrol_env, make_vec_metaworld_env
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from omegaconf import OmegaConf
+import hydra
 from stable_baselines3.common.vec_env import VecNormalize
 from reward_model import RewardModel
 
@@ -62,11 +64,7 @@ if __name__ == "__main__":
     parser.add_argument("--re-feed-type", help="type of feedback", type=int, default=0)
     parser.add_argument("--re-large-batch", help="size of buffer for ensemble uncertainty", type=int, default=10)
     parser.add_argument("--re-max-feed", help="# of total feedback", type=int, default=1400)
-    parser.add_argument("--teacher-beta", type=float, default=-1)
-    parser.add_argument("--teacher-gamma", type=float, default=1.0)
-    parser.add_argument("--teacher-eps-mistake", type=float, default=0.0)
-    parser.add_argument("--teacher-eps-skip", type=float, default=0.0)
-    parser.add_argument("--teacher-eps-equal", type=float, default=0.0)
+    parser.add_argument("--teachers", type=str, default='standard')
     args = parser.parse_args()
     
     metaworld_flag = False
@@ -76,17 +74,21 @@ if __name__ == "__main__":
         max_ep_len = 500
     
     env_name = args.env
+
+    # get teacher configs
+    teacher_cfg = OmegaConf.load(
+        os.path.join("config", "teacher", f"{args.teachers}.yaml"))
         
     if args.normalize == 1:
         args.tensorboard_log += 'normalized_' + env_name
     else:
         args.tensorboard_log += env_name
-    
-    args.tensorboard_log += '/teacher_' + str(args.teacher_beta)
-    args.tensorboard_log += '_' + str(args.teacher_gamma)
-    args.tensorboard_log += '_' + str(args.teacher_eps_mistake)
-    args.tensorboard_log += '_' + str(args.teacher_eps_skip)
-    args.tensorboard_log += '_' + str(args.teacher_eps_equal)
+
+    args.tensorboard_log += '/teacher_' + str(teacher_cfg.teacher.params.beta)
+    args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.gamma)
+    args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.eps_mistake)
+    args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.eps_skip)
+    args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.eps_equal)
     
     args.tensorboard_log += '/lr_'+str(args.lr)
     args.tensorboard_log += '_reward_lr' + str(args.re_lr)
@@ -141,16 +143,17 @@ if __name__ == "__main__":
         size_segment=args.re_segment,
         activation=args.re_act, 
         lr=args.re_lr,
-        mb_size=args.re_batch, 
-        teacher_beta=args.teacher_beta, 
-        teacher_gamma=args.teacher_gamma, 
-        teacher_eps_mistake=args.teacher_eps_mistake,
-        teacher_eps_skip=args.teacher_eps_skip, 
-        teacher_eps_equal=args.teacher_eps_equal,
+        mb_size=args.re_batch,
         large_batch=args.re_large_batch)
     
     if args.normalize == 1:
         env = VecNormalize(env, norm_reward=False)
+    
+    # instantiate teachers
+    teacher_cfg.teacher.params.ds = env.observation_space.shape[0]
+    teacher_cfg.teacher.params.da = env.action_space.shape[0]
+    teachers = hydra.utils.instantiate(teacher_cfg.teacher)
+    teachers.set_env(env)
     
     # network arch
     net_arch = [dict(pi=[args.hidden_dim]*args.num_layer, 
@@ -160,6 +163,7 @@ if __name__ == "__main__":
     # train model
     model = PPO_REWARD(
         reward_model,
+        teachers,
         MlpPolicy, env,
         tensorboard_log=args.tensorboard_log, 
         seed=args.seed, 

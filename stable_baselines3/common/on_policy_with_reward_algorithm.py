@@ -54,6 +54,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
     def __init__(
         self,
         reward_model,
+        teachers,
         policy: Union[str, Type[ActorCriticPolicy]],
         env: Union[GymEnv, str],
         learning_rate: Union[float, Schedule],
@@ -111,6 +112,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         
         # reward learning
         self.reward_model = reward_model
+        self.teachers = teachers
         self.thres_interaction = num_interaction
         self.num_feed = num_feed
         self.feed_type = feed_type
@@ -174,27 +176,41 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         
         # update margin
         new_margin = np.mean(self.avg_train_true_return) * (self.size_segment / self.max_ep_len)
-        self.reward_model.set_teacher_thres_skip(new_margin)
-        self.reward_model.set_teacher_thres_equal(new_margin)
+        self.teachers.set_teacher_thres_skip(new_margin)
+        self.teachers.set_teacher_thres_equal(new_margin)
         
+        queries = 0
         if self.first_reward_train == 0:
-            labeled_queries = self.reward_model.uniform_sampling()
+            queries = self.reward_model.uniform_sampling()
         else:
             if self.feed_type == 0:
-                labeled_queries = self.reward_model.uniform_sampling()
+                queries = self.reward_model.uniform_sampling()
             elif self.feed_type == 1:
-                labeled_queries = self.reward_model.disagreement_sampling()
+                queries = self.reward_model.disagreement_sampling()
             elif self.feed_type == 2:
-                labeled_queries = self.reward_model.entropy_sampling()
+                queries = self.reward_model.entropy_sampling()
             else:
                 raise NotImplementedError
         
+        sa_t_1, sa_t_2, r_t_1, r_t_2 = queries
+
+        # get teacher
+        teacher = self.teachers.uniform_sampling(sa_t_1, sa_t_2)
+
+        # get labels
+        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = teacher.get_label(*queries)
+
+        
+        #  put querries
+        if len(labels) > 0:
+            self.reward_model.put_queries(sa_t_1, sa_t_2, labels)
+
         self.total_feed += self.reward_model.mb_size
-        self.labeled_feedback += labeled_queries
+        self.labeled_feedback += len(labels)
         
         # update reward
         for epoch in range(self.re_update):
-            if self.reward_model.teacher_eps_equal > 0:
+            if teacher.eps_equal > 0:
                 train_acc = self.reward_model.train_soft_reward()
             else:
                 train_acc = self.reward_model.train_reward()

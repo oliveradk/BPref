@@ -18,6 +18,8 @@ from collections import deque
 from skimage.util.shape import view_as_windows
 from torch import nn
 from torch import distributions as pyd
+
+from stable_baselines3.common.vec_env.base_vec_env import VecEnv
     
 def make_env(cfg):
     """Helper function to create dm_control environment"""
@@ -310,7 +312,10 @@ def get_info(sa_t, env, keys, ds, da):
         for frame in query[:]:
             obs = frame[:ds]
             action = frame[ds:]
-            _reward, info = env.evaluate_state(obs, action)
+            if isinstance(env, VecEnv):
+                _reward, info = env.env_method('evaluate_state', obs, action, indices=[0])[0]
+            else:
+                _reward, info = env.evaluate_state(obs, action)
             for key in keys:
                 info_dict[key].append(info[key])
         info_dicts.append(info_dict)
