@@ -25,8 +25,8 @@ class GraspTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_beta(self, sa_t):
-        info = utils.get_info(sa_t, self.env, ['grasp_success'], self.ds, self.da)
+    def get_beta(self, sa_t, info_t):
+        info = utils.get_info_lists(info_t, ['grasp_success'])
         grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in info])
 
 
@@ -58,10 +58,9 @@ class NonGraspTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_beta(self, sa_t):
-        info = utils.get_info(sa_t, self.env, ['grasp_success'], self.ds, self.da)
+    def get_beta(self, sa_t, info_t):
+        info = utils.get_info_lists(info_t, ['grasp_success'])
         grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in info])
-
 
         beta = np.zeros(grasp_mean.shape)
         beta[grasp_mean >= self.grasp_thresh] = self.beta_1

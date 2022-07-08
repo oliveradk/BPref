@@ -119,6 +119,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         self.re_update = re_update
         self.traj_obsact = None
         self.traj_reward = None
+        self.traj_info = None
         self.first_reward_train = 0
         self.num_interactions = 0
         self.metaworld_flag = metaworld_flag
@@ -192,7 +193,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             else:
                 raise NotImplementedError
         
-        sa_t_1, sa_t_2, r_t_1, r_t_2 = queries
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
 
         # get teacher
         teacher = self.teachers.uniform_sampling(sa_t_1, sa_t_2)
@@ -256,6 +257,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
                 obs_tensor = th.as_tensor(self._last_obs).to(self.device)
                 actions, values, log_probs = self.policy.forward(obs_tensor)
             actions = actions.cpu().numpy()
+            infos = self._last_infos
 
             # Rescale and perform action
             clipped_actions = actions
@@ -275,9 +277,12 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             if self.traj_obsact is None:
                 self.traj_obsact = obsact
                 self.traj_reward = batch_reward
+                self.traj_info = [[info] for info in infos]
             else:
                 self.traj_obsact = np.concatenate((self.traj_obsact, obsact), axis=1)
                 self.traj_reward = np.concatenate((self.traj_reward, batch_reward), axis=1)
+                for i, info in enumerate(infos):
+                    self.traj_info[i].append(info)
             
             self.num_timesteps += env.num_envs
             self.num_interactions += env.num_envs
@@ -286,9 +291,9 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             num_dones = int(sum(dones))
             if num_dones > 0:
                 # add samples to buffer
-                self.reward_model.add_data_batch(self.traj_obsact, self.traj_reward)
+                self.reward_model.add_data_batch(self.traj_obsact, self.traj_reward, self.traj_info)
                 # reset traj
-                self.traj_obsact, self.traj_reward = None, None
+                self.traj_obsact, self.traj_reward, self.traj_info = None, None, None
                 
                 # train reward using random data
                 if self.first_reward_train == 0:
@@ -330,6 +335,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             rollout_buffer.add(self._last_obs, actions, pred_reward, self._last_dones, values, log_probs)
             self._last_obs = new_obs
             self._last_dones = dones
+            self._last_infos = infos
 
         with th.no_grad():
             # Compute value for the last timestep
@@ -365,6 +371,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
                 # Convert to pytorch tensor
                 obs_tensor = th.as_tensor(self._last_obs).to(self.device)
                 actions, values, log_probs = self.policy.forward(obs_tensor)
+            infos = self._last_infos
             actions = actions.cpu().numpy()
 
             # Rescale and perform action
@@ -391,9 +398,12 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             if self.traj_obsact is None:
                 self.traj_obsact = obsact
                 self.traj_reward = batch_reward
+                self.traj_info = [[info] for info in infos]
             else:
                 self.traj_obsact = np.concatenate((self.traj_obsact, obsact), axis=1)
                 self.traj_reward = np.concatenate((self.traj_reward, batch_reward), axis=1)
+                for i, info in enumerate(infos):
+                    self.traj_info[i].append(info)
             
             self.num_timesteps += env.num_envs
             self.num_interactions += env.num_envs
@@ -403,9 +413,9 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             if num_dones > 0:
                 # add samples to buffer
                 if self.reward_model:
-                    self.reward_model.add_data_batch(self.traj_obsact, self.traj_reward)
+                    self.reward_model.add_data_batch(self.traj_obsact, self.traj_reward, self.traj_info)
                 # reset traj
-                self.traj_obsact, self.traj_reward = None, None
+                self.traj_obsact, self.traj_reward, self.traj_info = None, None, None
                                 
                 if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
                     ep_reward = []
@@ -437,6 +447,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             rollout_buffer.add(self._last_obs, actions, pred_reward, self._last_dones, values, log_probs)
             self._last_obs = new_obs
             self._last_dones = dones
+            self._last_infos = infos
 
         with th.no_grad():
             # Compute value for the last timestep
@@ -527,6 +538,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             rollout_buffer.add(self._last_obs, actions, rewards, self._last_dones, values, log_probs)
             self._last_obs = new_obs
             self._last_dones = dones
+            self._last_infos = infos
 
         with th.no_grad():
             # Compute value for the last timestep

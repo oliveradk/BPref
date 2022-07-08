@@ -129,6 +129,7 @@ class BaseAlgorithm(ABC):
         self.lr_schedule = None  # type: Optional[Schedule]
         self._last_obs = None  # type: Optional[np.ndarray]
         self._last_dones = None  # type: Optional[np.ndarray]
+        self._last_infos = None
         # When using VecNormalize:
         self._last_original_obs = None  # type: Optional[np.ndarray]
         self._episode_num = 0
@@ -370,6 +371,7 @@ class BaseAlgorithm(ABC):
         if reset_num_timesteps or self._last_obs is None:
             self._last_obs = self.env.reset()
             self._last_dones = np.zeros((self.env.num_envs,), dtype=np.bool)
+            self._last_infos = {}
             # Retrieve unnormalized observation for saving into the buffer
             if self._vec_normalize_env is not None:
                 self._last_original_obs = self._vec_normalize_env.get_original_obs()

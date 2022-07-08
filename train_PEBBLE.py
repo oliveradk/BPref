@@ -173,12 +173,7 @@ class Workspace(object):
                 queries = self.reward_model.kcenter_entropy_sampling()
             else:
                 raise NotImplementedError
-        sa_t_1, sa_t_2, r_t_1, r_t_2 = queries
-        save_dir = '/home/danielskoch/BPref/saved_objs'
-        # np.save(os.path.join(save_dir, 'sa_t_1'), sa_t_1)
-        # np.save(os.path.join(save_dir, 'sa_t_2'), sa_t_2)
-        # np.save(os.path.join(save_dir, 'r_t_1'), r_t_1)
-        # np.save(os.path.join(save_dir, 'r_t_2'), r_t_2)
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
         # get teacher
         teacher = self.teachers.uniform_sampling(sa_t_1, sa_t_2)
         
@@ -358,12 +353,11 @@ class Workspace(object):
                 episode_success = max(episode_success, extra['success'])
             
             if self.log_info:
-                _, env_info = self.env.evaluate_state(obs, action) 
-                for key, value in env_info.items():
-                    sum_env_info[key] += value
+                for key in sum_env_info.keys():
+                    sum_env_info[key] += value 
                 
             # adding data to the reward training data
-            self.reward_model.add_data(obs, action, reward, done)
+            self.reward_model.add_data(obs, action, reward, done, extra)
             self.replay_buffer.add(
                 obs, action, reward_hat, 
                 next_obs, done, done_no_max)

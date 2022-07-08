@@ -22,11 +22,10 @@ class RewardBetaTeacher(Teacher):
         self.beta_scale = beta_scale
         super().__init__(ds, da, gamma, eps_mistake, eps_skip, eps_equal)
     
-    def get_beta(self, sa_t):
-        info = utils.get_info(sa_t, self.env, 
-                [self.UNSCALED_REWARD, self.reward_key], self.ds, self.da)
-        key_mean = np.array([np.mean(info_dict[self.reward_key]) for info_dict in info])
-        reward_mean = np.array([np.mean(info_dict[self.UNSCALED_REWARD]) for info_dict in info])
+    def get_beta(self, sa_t, info_t):
+        info_lists = utils.get_info_lists(info_t, [self.UNSCALED_REWARD, self.reward_key])
+        key_mean = np.array([np.mean(info_dict[self.reward_key]) for info_dict in info_lists])
+        reward_mean = np.array([np.mean(info_dict[self.UNSCALED_REWARD]) for info_dict in info_lists])
         return (key_mean / reward_mean) * self.beta_scale
         
 

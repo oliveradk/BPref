@@ -305,24 +305,18 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True, log_obs=
         frames = frames.permute(0, 1, 4, 2, 3)
         writer.add_video(f'{tag}/video', frames, step, fps=30)
 
-def get_info(sa_t, env, keys, ds, da):
-    info_dicts = []
-    for query in sa_t[:]:
-        info_dict = {key: [] for key in keys}
-        for frame in query[:]:
-            obs = frame[:ds]
-            action = frame[ds:]
-            if isinstance(env, VecEnv):
-                _reward, info = env.env_method('evaluate_state', obs, action, indices=[0])[0]
-            else:
-                _reward, info = env.evaluate_state(obs, action)
+def get_info_lists(info_t, keys):
+    info_lists = []
+    for dict_list in info_t: # each list of dicts in info_t
+        new_dict = {key: [] for key in keys}
+        for info_dict in dict_list:
             for key in keys:
-                info_dict[key].append(info[key])
-        info_dicts.append(info_dict)
-    return info_dicts
+                new_dict[key].append(info_dict[key])
+        info_lists.append(new_dict)
+    return info_lists
 
-def get_partial_reward(sa_t, env, reward_key, ds, da):
-    info = get_info(sa_t, env, [reward_key], ds, da)
+def get_partial_reward(info_t, reward_key):
+    info = get_info_lists(info_t, [reward_key])
 
     rew = [el[reward_key] for el in info]
 
@@ -350,3 +344,7 @@ def extend_param(param, n):
 
 def arr_to_list(arr):
     return [float(el) for el in arr]
+
+def dict_to_struct_array(dict):
+    dtype = [(key, type(value)) for key, value in dict.items()]
+    return np.array(tuple(dict.values()), dtype=dtype)

@@ -10,6 +10,7 @@ import copy
 import scipy.stats as st
 import os
 import time
+from itertools import chain
 
 from scipy.stats import norm
 
@@ -114,6 +115,7 @@ class RewardModel:
         self.construct_ensemble()
         self.inputs = []
         self.targets = []
+        self.infos = []
         self.raw_actions = []
         self.img_inputs = []
         self.mb_size = mb_size
@@ -150,9 +152,10 @@ class RewardModel:
             
         self.opt = torch.optim.Adam(self.paramlst, lr = self.lr)
             
-    def add_data(self, obs, act, rew, done):
+    def add_data(self, obs, act, rew, done, extra):
         sa_t = np.concatenate([obs, act], axis=-1)
         r_t = rew
+        info_t = extra
         
         flat_input = sa_t.reshape(1, self.da+self.ds)
         r_t = np.array(r_t)
@@ -162,28 +165,35 @@ class RewardModel:
         if init_data:
             self.inputs.append(flat_input)
             self.targets.append(flat_target)
+            self.infos.append([info_t])
         elif done:
             self.inputs[-1] = np.concatenate([self.inputs[-1], flat_input])
             self.targets[-1] = np.concatenate([self.targets[-1], flat_target])
+            self.infos[-1].append(info_t)
             # FIFO
             if len(self.inputs) > self.max_size:
                 self.inputs = self.inputs[1:]
                 self.targets = self.targets[1:]
+                self.infos = self.infos[1:]
             self.inputs.append([])
             self.targets.append([])
+            self.infos.append([])
         else:
             if len(self.inputs[-1]) == 0:
                 self.inputs[-1] = flat_input
                 self.targets[-1] = flat_target
+                self.infos[-1] = [info_t]
             else:
                 self.inputs[-1] = np.concatenate([self.inputs[-1], flat_input])
                 self.targets[-1] = np.concatenate([self.targets[-1], flat_target])
+                self.infos[-1].append(extra)
                 
-    def add_data_batch(self, obses, rewards):
+    def add_data_batch(self, obses, rewards, infos):
         num_env = obses.shape[0]
         for index in range(num_env):
             self.inputs.append(obses[index])
             self.targets.append(rewards[index])
+            self.infos.append(infos[index])
         
     def get_rank_probability(self, x_1, x_2):
         # get probability x_1 > x_2
@@ -304,19 +314,24 @@ class RewardModel:
         # get train traj
         train_inputs = np.array(self.inputs[:max_len])
         train_targets = np.array(self.targets[:max_len])
+        info_targets = self.infos[:max_len]
    
         batch_index_2 = np.random.choice(max_len, size=mb_size, replace=True)
         sa_t_2 = train_inputs[batch_index_2] # Batch x T x dim of s&a
         r_t_2 = train_targets[batch_index_2] # Batch x T x 1
+        info_t_2 = [info_targets[i] for i in batch_index_2]
         
         batch_index_1 = np.random.choice(max_len, size=mb_size, replace=True)
         sa_t_1 = train_inputs[batch_index_1] # Batch x T x dim of s&a
         r_t_1 = train_targets[batch_index_1] # Batch x T x 1
+        info_t_1 = [info_targets[i] for i in batch_index_1]
                 
         sa_t_1 = sa_t_1.reshape(-1, sa_t_1.shape[-1]) # (Batch x T) x dim of s&a
         r_t_1 = r_t_1.reshape(-1, r_t_1.shape[-1]) # (Batch x T) x 1
+        info_t_1 = list(chain.from_iterable(info_t_1))
         sa_t_2 = sa_t_2.reshape(-1, sa_t_2.shape[-1]) # (Batch x T) x dim of s&a
         r_t_2 = r_t_2.reshape(-1, r_t_2.shape[-1]) # (Batch x T) x 1
+        info_t_2 = list(chain.from_iterable(info_t_2))
 
         # Generate time index 
         time_index = np.array([list(range(i*len_traj,
@@ -326,10 +341,12 @@ class RewardModel:
         
         sa_t_1 = np.take(sa_t_1, time_index_1, axis=0) # Batch x size_seg x dim of s&a
         r_t_1 = np.take(r_t_1, time_index_1, axis=0) # Batch x size_seg x 1
+        info_t_1 = [[info_t_1[idx] for idx in row] for row in time_index_1] #for each batch 
         sa_t_2 = np.take(sa_t_2, time_index_2, axis=0) # Batch x size_seg x dim of s&a
         r_t_2 = np.take(r_t_2, time_index_2, axis=0) # Batch x size_seg x 1
+        info_t_2 = [[info_t_2[idx] for idx in row] for row in time_index_2]
                 
-        return sa_t_1, sa_t_2, r_t_1, r_t_2
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
 
     def put_queries(self, sa_t_1, sa_t_2, labels):
         total_sample = sa_t_1.shape[0]
@@ -358,7 +375,7 @@ class RewardModel:
         
         # get queries
         num_init = self.mb_size*self.large_batch
-        sa_t_1, sa_t_2, r_t_1, r_t_2 =  self.get_queries(
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = self.get_queries(
             mb_size=num_init)
         
         # get final queries based on kmeans clustering
@@ -378,8 +395,10 @@ class RewardModel:
 
         r_t_1, sa_t_1 = r_t_1[selected_index], sa_t_1[selected_index]
         r_t_2, sa_t_2 = r_t_2[selected_index], sa_t_2[selected_index]
+        info_t_1 = [info_t_1[i] for i in selected_index]
+        info_t_2 = [info_t_2[i] for i in selected_index]  
         
-        return sa_t_1, sa_t_2, r_t_1, r_t_2
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
     
     def kcenter_disagree_sampling(self):
         
@@ -395,6 +414,8 @@ class RewardModel:
         top_k_index = (-disagree).argsort()[:num_init_half]
         r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
         r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
+        info_t_1 = [info_t_1[i] for i in top_k_index]
+        info_t_2 = [info_t_2[i] for i in top_k_index]
         
         # get final queries based on kmeans clustering
         temp_sa_t_1 = sa_t_1[:,:,:self.ds]
@@ -414,8 +435,10 @@ class RewardModel:
         
         r_t_1, sa_t_1 = r_t_1[selected_index], sa_t_1[selected_index]
         r_t_2, sa_t_2 = r_t_2[selected_index], sa_t_2[selected_index]
+        info_t_1 = [info_t_1[i] for i in selected_index]
+        info_t_2 = [info_t_2[i] for i in selected_index] 
 
-        return sa_t_1, sa_t_2, r_t_1, r_t_2
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
     
     def kcenter_entropy_sampling(self):
         
@@ -423,7 +446,7 @@ class RewardModel:
         num_init_half = int(num_init*0.5)
         
         # get queries
-        sa_t_1, sa_t_2, r_t_1, r_t_2 =  self.get_queries(
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 =  self.get_queries(
             mb_size=num_init)
         
         
@@ -432,6 +455,8 @@ class RewardModel:
         top_k_index = (-entropy).argsort()[:num_init_half]
         r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
         r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
+        info_t_1 = [info_t_1[i] for i in top_k_index]
+        info_t_2 = [info_t_2[i] for i in top_k_index]  
         
         # get final queries based on kmeans clustering
         temp_sa_t_1 = sa_t_1[:,:,:self.ds]
@@ -451,28 +476,32 @@ class RewardModel:
         
         r_t_1, sa_t_1 = r_t_1[selected_index], sa_t_1[selected_index]
         r_t_2, sa_t_2 = r_t_2[selected_index], sa_t_2[selected_index]
-        return sa_t_1, sa_t_2, r_t_1, r_t_2
+        info_t_1 = [info_t_1[i] for i in selected_index]
+        info_t_2 = [info_t_2[i] for i in selected_index]  
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
     
     def uniform_sampling(self):
         # get queries
-        sa_t_1, sa_t_2, r_t_1, r_t_2 =  self.get_queries(
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = self.get_queries(
             mb_size=self.mb_size)
 
-        return sa_t_1, sa_t_2, r_t_1, r_t_2    
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2    
     
     def disagreement_sampling(self):
         
         # get queries
-        sa_t_1, sa_t_2, r_t_1, r_t_2 =  self.get_queries(
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 =  self.get_queries(
             mb_size=self.mb_size*self.large_batch)
         
         # get final queries based on uncertainty
         _, disagree = self.get_rank_probability(sa_t_1, sa_t_2)
         top_k_index = (-disagree).argsort()[:self.mb_size]
         r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
-        r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]        
+        r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
+        info_t_1 = [info_t_1[i] for i in top_k_index]
+        info_t_2 = [info_t_2[i] for i in top_k_index]        
         
-        return sa_t_1, sa_t_2, r_t_1, r_t_2
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
     
     def entropy_sampling(self):
         
@@ -486,6 +515,8 @@ class RewardModel:
         top_k_index = (-entropy).argsort()[:self.mb_size]
         r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
         r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
+        info_t_1 = [info_t_1[i] for i in top_k_index]
+        info_t_2 = [info_t_2[i] for i in top_k_index]  
         
         return sa_t_1, sa_t_2, r_t_1, r_t_2
     

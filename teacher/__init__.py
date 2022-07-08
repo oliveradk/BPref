@@ -33,14 +33,14 @@ class Teacher():
     def set_thres_equal(self, new_margin):
         self.thres_equal = new_margin * self.eps_equal
     
-    def get_beta(self, sa_t):
+    def get_beta(self, sa_t, info_t):
         raise NotImplementedError
     
-    def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
+    def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
         return r_t_1, r_t_2
 
-    def get_label(self, sa_t_1, sa_t_2, r_t_1, r_t_2):
-        r_t_1, r_t_2 = self.process_reward(sa_t_1, sa_t_2, r_t_1, r_t_2)
+    def get_label(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+        r_t_1, r_t_2 = self.process_reward(sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2)
         
         sum_r_t_1 = np.sum(r_t_1, axis=1)
         sum_r_t_2 = np.sum(r_t_2, axis=1)
@@ -74,8 +74,8 @@ class Teacher():
             
         
         # Bradley-Terry rational model #TODO: allow for -beta to be perfect rationality
-        beta_1 = self.get_beta(sa_t_1)
-        beta_2 = self.get_beta(sa_t_2)
+        beta_1 = self.get_beta(sa_t_1, info_t_1)
+        beta_2 = self.get_beta(sa_t_2, info_t_2)
 
         r_hat = torch.cat([torch.Tensor(sum_r_t_1) * beta_1, 
                             torch.Tensor(sum_r_t_2) * beta_2], axis=-1)
