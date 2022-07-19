@@ -2,12 +2,12 @@ teacher:
   name: gaussian_beta
   class: teacher.gaussian_beta.GaussianBetaTeachers
   params:
-        n_teachers: 5
+        n_teachers: 1
         ds: ???
         da: ???
         gamma: 1
         eps_mistake: 0
         eps_skip: 0
         eps_equal: 0
-        width_divisor: 4
-        beta_scale: 1
+        width_divisor: 2
+        beta_scale: 4

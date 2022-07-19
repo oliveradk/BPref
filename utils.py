@@ -348,3 +348,9 @@ def arr_to_list(arr):
 def dict_to_struct_array(dict):
     dtype = [(key, type(value)) for key, value in dict.items()]
     return np.array(tuple(dict.values()), dtype=dtype)
+
+def apply_map(func, l):
+    return [el for el in map(func, l)]
+
+def remove_duplicates(df):
+    return df.loc[:, ~df.columns.duplicated()]
