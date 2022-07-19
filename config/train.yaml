@@ -33,5 +33,6 @@ save_model: true
 # hydra configuration
 hydra:
     name: ${env}
+    exp_name: default
     run:
-        dir: ./exp/${env}/H${diag_gaussian_actor.params.hidden_dim}_L${diag_gaussian_actor.params.hidden_depth}_B${agent.params.batch_size}_tau${agent.params.critic_tau}/${agent.name}_unsup${num_unsup_steps}_topk${topK}_${experiment}_lr${agent.params.actor_lr}_temp${agent.params.init_temperature}_seed${seed}
+        dir: ./exp/${hydra.exp_name}/${env}/H${diag_gaussian_actor.params.hidden_dim}_L${diag_gaussian_actor.params.hidden_depth}_B${agent.params.batch_size}_tau${agent.params.critic_tau}/${agent.name}_unsup${num_unsup_steps}_topk${topK}_${experiment}_lr${agent.params.actor_lr}_temp${agent.params.init_temperature}_seed${seed}
