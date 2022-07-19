@@ -78,7 +78,17 @@ class GaussianBetaTeachers(Teachers):
         self.define_teachers(env.observation_space, log_dir=log_dir)
         super().set_env(env)
     
-            
+    def get_points(self, strata, box):
+        return utils.strata_center(strata)
+        # return stratified_sampling(strata)
+    
+    def get_widths(self, strata, box):
+        return [utils.box_widths(box)] * len(strata)
+        # return utils.strata_width(strata)
+
+    def get_scale(self, vol):
+        return self.beta_scale * vol
+        # return self.beta_scale * vol/self.n_teachers
     
     def define_teachers(self, obs_space, duplicates=False, log_dir=None):
         #preprocess environment space (remove duplicate and zero dimensions, normalize?)
@@ -90,11 +100,11 @@ class GaussianBetaTeachers(Teachers):
             cuboid=(box.low.tolist(), box.high.tolist())
         )
         #get center of each strata
-        points = utils.strata_center(strata)
+        points = self.get_points(strata, box)
         #calculate strata width for each
-        strata_widths = utils.strata_width(strata)
+        strata_widths = self.get_widths(strata, box)
         
-        scale = self.beta_scale * vol/self.n_teachers
+        scale = self.get_scale(vol)
         for i in range(self.n_teachers):
             beta_func = Gaussian(points[i], strata_widths[i]/self.width_divisor, scale)
             teacher = GaussianBetaTeacher(
