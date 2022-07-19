@@ -32,7 +32,8 @@ class StandardTeachers(Teachers):
         gamma, 
         eps_mistake,
         eps_skip,
-        eps_equal
+        eps_equal,
+        sampling
     ):
         n = len(beta)
         gamma = utils.extend_param(gamma, n)
@@ -44,4 +45,4 @@ class StandardTeachers(Teachers):
         for i in range(n):
             teachers.append(StandardTeacher(beta[i], ds, da, gamma[i], 
                             eps_mistake[i], eps_skip[i], eps_equal[i]))
-        super().__init__(teachers)
+        super().__init__(teachers, sampling=sampling)

@@ -10,4 +10,4 @@ teacher:
         eps_skip: 0
         eps_equal: 0
         width_divisor: 2
-        beta_scale: 4
+        sampling: uniform

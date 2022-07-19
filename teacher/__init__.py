@@ -94,12 +94,31 @@ class Teacher():
         return sa_t_1, sa_t_2, r_t_1, r_t_2, labels
 
 class Teachers():
-    def __init__(self, teachers: List[Teacher]):
+    def __init__(self, teachers: List[Teacher], sampling='uniform'):
         self.teachers = teachers
+        self.sampling = sampling
     
-    def uniform_sampling(self, sa_t_1, sa_t_2):
+    def sample_teacher(self, sa_t_1, sa_t_2, info_t_1, info_t_2):
+        if self.sampling == 'uniform':
+            return self.uniform_sampling(sa_t_1, sa_t_2, info_t_1, info_t_2)
+        elif self.sampling == 'max_beta':
+            return self.max_beta(sa_t_1, sa_t_2, info_t_1, info_t_2)
+        else: 
+            raise ValueError(f"invalid teacher sampling method {self.sampling}")
+    
+    def uniform_sampling(self, sa_t_1, sa_t_2, info_t_1, info_t_2):
         return random.choice(self.teachers)
     
+    def max_beta(self, sa_t_1, sa_t_2, info_t_1, info_t_2):
+        betas = []
+        for teacher in self.teachers:
+            beta_1 = teacher.get_beta(sa_t_1, info_t_1)
+            beta_2 = teacher.get_beta(sa_t_2, info_t_2)
+            beta_sum_mean = (beta_1 + beta_2).mean()
+            betas.append(beta_sum_mean)
+        return self.teachers[np.argmax(betas)]
+
+
     def set_teacher_thres_skip(self, new_margin):
         for teacher in self.teachers:
             teacher.set_thres_skip(new_margin)
