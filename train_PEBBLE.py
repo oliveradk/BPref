@@ -141,11 +141,10 @@ class Workspace(object):
                         self.step)
         self.logger.log('eval/true_episode_reward', average_true_episode_reward,
                         self.step)
-        #TODO: parameter for metaworld state info
         if self.log_success:
             self.logger.log('eval/success_rate', success_rate,
                     self.step)
-            self.logger.log('train/true_episode_success', success_rate,
+            self.logger.log('eval/true_episode_success', success_rate,
                         self.step)
         if self.log_info:
             for key, value in avg_env_info.items():
