@@ -80,34 +80,34 @@ class GaussianBetaTeachers(Teachers):
             
     
     def define_teachers(self, obs_space, duplicates=False, log_dir=None):
-            #preprocess environment space (remove duplicate and zero dimensions, normalize?)
-            box, obs_mask = self._process_obs_space(obs_space, duplicates=duplicates)
-            vol = utils.box_vol(box)
-            #partition envionment space into n strata (don't need actual enviornment, only observation_space)
-            strata = stratify_generalized(
-                self.n_teachers, box.shape[0],  
-                cuboid=(box.low.tolist(), box.high.tolist())
-            )
-            #sample points from strata
-            points = stratified_sampling(strata)
-            #calculate strata width for each
-            strata_widths = utils.strata_width(strata)
-            
-            scale = self.beta_scale * vol/self.n_teachers
-            for i in range(self.n_teachers):
-                beta_func = Gaussian(points[i], strata_widths[i]/self.width_divisor, scale)
-                teacher = GaussianBetaTeacher(
-                    ds=self.params['ds'],
-                    da=self.params['da'],
-                    beta_func=beta_func,
-                    obs_mask=obs_mask,
-                    gamma=self.params['gamma'][i],
-                    eps_mistake=self.params['eps_mistake'][i],
-                    eps_skip=self.params['eps_skip'][i],
-                    eps_equal=self.params['eps_equal'][i])
-                self.teachers.append(teacher)
-            if log_dir:
-                self.log_teachers(log_dir) 
+        #preprocess environment space (remove duplicate and zero dimensions, normalize?)
+        box, obs_mask = self._process_obs_space(obs_space, duplicates=duplicates)
+        vol = utils.box_vol(box)
+        #partition envionment space into n strata (don't need actual enviornment, only observation_space)
+        strata = stratify_generalized(
+            self.n_teachers, box.shape[0],  
+            cuboid=(box.low.tolist(), box.high.tolist())
+        )
+        #sample points from strata
+        points = stratified_sampling(strata)
+        #calculate strata width for each
+        strata_widths = utils.strata_width(strata)
+        
+        scale = self.beta_scale * vol/self.n_teachers
+        for i in range(self.n_teachers):
+            beta_func = Gaussian(points[i], strata_widths[i]/self.width_divisor, scale)
+            teacher = GaussianBetaTeacher(
+                ds=self.params['ds'],
+                da=self.params['da'],
+                beta_func=beta_func,
+                obs_mask=obs_mask,
+                gamma=self.params['gamma'][i],
+                eps_mistake=self.params['eps_mistake'][i],
+                eps_skip=self.params['eps_skip'][i],
+                eps_equal=self.params['eps_equal'][i])
+            self.teachers.append(teacher)
+        if log_dir:
+            self.log_teachers(log_dir) 
 
     def log_teachers(self, log_dir):
         teacher_list = []
