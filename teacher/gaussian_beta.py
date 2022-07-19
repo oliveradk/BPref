@@ -88,8 +88,8 @@ class GaussianBetaTeachers(Teachers):
             self.n_teachers, box.shape[0],  
             cuboid=(box.low.tolist(), box.high.tolist())
         )
-        #sample points from strata
-        points = stratified_sampling(strata)
+        #get center of each strata
+        points = utils.strata_center(strata)
         #calculate strata width for each
         strata_widths = utils.strata_width(strata)
         

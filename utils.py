@@ -335,6 +335,9 @@ def remove_duplicates(obs_space):
 def strata_width(strata):
     return [np.array(stratum[1]) - np.array(stratum[0]) for stratum in strata]
 
+def strata_center(strata):
+    return [np.array(stratum[0]) + ((np.array(stratum[1]) - np.array(stratum[0])) / 2) for stratum in strata]
+
 def extend_param(param, n):
     if not isinstance(param, collections.abc.Sized):
         param = [param] * n
