@@ -214,6 +214,7 @@ class Workspace(object):
                 sum_env_info[key] = 0.0
 
         true_episode_reward = 0
+        betas = []
         
         # store train returns of recent 10 episodes
         avg_train_true_return = deque([], maxlen=10) 
@@ -236,6 +237,11 @@ class Workspace(object):
                 self.logger.log('train/true_episode_reward', true_episode_reward, self.step)
                 self.logger.log('train/total_feedback', self.total_feedback, self.step)
                 self.logger.log('train/labeled_feedback', self.labeled_feedback, self.step)
+
+                # log teacher betas
+                if len(betas) > 0:
+                    self.logger.log('train/beta_min', np.array(betas).min(), self.step)
+                    self.logger.log('train/beta_mean', np.array(betas).mean(), self.step)
                 
                 if self.log_success:
                     self.logger.log('train/episode_success', episode_success,
@@ -252,6 +258,7 @@ class Workspace(object):
                 episode_reward = 0
                 avg_train_true_return.append(true_episode_reward)
                 true_episode_reward = 0
+                betas = []
                 if self.log_success:
                     episode_success = 0
                 if self.log_info:
@@ -338,15 +345,18 @@ class Workspace(object):
             elif self.step > self.cfg.num_seed_steps:
                 self.agent.update_state_ent(self.replay_buffer, self.logger, self.step, 
                                             gradient_update=1, K=self.cfg.topK)
-                
+            
             next_obs, reward, done, extra = self.env.step(action)
+            teacher_betas = [teacher.get_beta(np.concatenate([obs, action])[None, None, :], [[extra]]) for teacher in self.teachers.teachers]
             reward_hat = self.reward_model.r_hat(np.concatenate([obs, action], axis=-1))
+            
 
             # allow infinite bootstrap
             done = float(done)
             done_no_max = 0 if episode_step + 1 == self.env._max_episode_steps else done
             episode_reward += reward_hat
             true_episode_reward += reward
+            betas.append(teacher_betas)
             
             if self.log_success:
                 episode_success = max(episode_success, extra['success'])
