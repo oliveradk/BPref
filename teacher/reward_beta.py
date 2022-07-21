@@ -26,7 +26,7 @@ class RewardBetaTeacher(Teacher):
         info_lists = utils.get_info_lists(info_t, [self.UNSCALED_REWARD, self.reward_key])
         key_mean = np.array([np.mean(info_dict[self.reward_key]) for info_dict in info_lists])
         reward_mean = np.array([np.mean(info_dict[self.UNSCALED_REWARD]) for info_dict in info_lists])
-        return (key_mean / reward_mean) * self.beta_scale
+        return ((key_mean / reward_mean) * self.beta_scale)[:, None]
         
 
 class RewardBetaTeachers(Teachers):

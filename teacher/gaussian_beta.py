@@ -17,7 +17,8 @@ class Gaussian:
         self.var = multivariate_normal(mean=center, cov=np.identity(d) * width)
     
     def __call__(self, obs):
-        return self.scale * self.var.pdf(obs)
+        density = self.scale * self.var.pdf(obs)
+        return density.reshape(obs.shape[:-1]) # readd empty dimensions
     
     def __str__(self) -> str:
         return f"Gaussian: center {self.center}, width {self.width}, scale {self.scale}"
@@ -42,7 +43,7 @@ class GaussianBetaTeacher(Teacher):
     def get_beta(self, sa_t, info_t):
         s = sa_t[:, :, :self.ds]
         p_s = s[:, :, self.obs_mask]
-        return self.beta_func(p_s).mean(axis=1) #NOTE does this brodcast correctly?
+        return self.beta_func(p_s).mean(axis=1)[:, None]
     
 
 class GaussianBetaTeachers(Teachers):
@@ -87,8 +88,8 @@ class GaussianBetaTeachers(Teachers):
         # return utils.strata_width(strata)
 
     def get_scale(self, vol):
-        return self.beta_scale * vol
-        # return self.beta_scale * vol/self.n_teachers
+        # return self.beta_scale * vol
+        return (self.beta_scale * vol) /self.n_teachers
     
     def define_teachers(self, obs_space, duplicates=False, log_dir=None):
         #preprocess environment space (remove duplicate and zero dimensions, normalize?)
