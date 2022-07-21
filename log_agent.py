@@ -5,6 +5,7 @@ import hydra
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 from teacher.grasp import GraspingTeachers
+from teacher.gaussian_beta import GaussianBetaTeachers
 from metaworld.envs.mujoco.sawyer_xyz.v2 import SawyerSweepEnvV2
 
 import utils
@@ -33,8 +34,7 @@ def log_agent(exp_path, log_dir, episodes, log_obs):
     agent.load(model_dir=exp_path, step=1000000)
 
     #load teachers
-    teachers = GraspingTeachers(0.5, env.observation_space.shape[0], 
-        env.action_space.shape[0], [1,1], [0.5, 0.5,], [1, 1], [0, 0], [0, 0], [0, 0])
+    teachers = GaussianBetaTeachers(1, env.observation_space.shape[0], env.action_space.shape[0], 1, 0, 0, 0, 2, 800, 'uniform')
     teachers.set_env(env)
     
     for episode in range(episodes):
@@ -44,7 +44,6 @@ def log_agent(exp_path, log_dir, episodes, log_obs):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_path', type=str, required=True)
-    parser.add_argument('--agent_step', type=int, required=True)
     parser.add_argument('--log_dir', type=str, default='episode_logs')
     parser.add_argument('--log_obs', default=False, action='store_true')
     parser.add_argument('--episodes', type=int, default=1)
