@@ -53,4 +53,4 @@ hydra:
     name: ${env}
     exp_name: default
     run:
-        dir: ./exp/${hydra.exp_name}/${env}/H${diag_gaussian_actor.params.hidden_dim}_L${diag_gaussian_actor.params.hidden_depth}_lr${agent.params.actor_lr}/teacher${teacher.class}${teacher.params}/label_smooth_${label_margin}/schedule_${reward_schedule}/${experiment}_init${num_seed_steps}_unsup${num_unsup_steps}_inter${num_interact}_maxfeed${max_feedback}_seg${segment}_act${activation}_Rlr${reward_lr}_Rbatch${reward_batch}_Rupdate${reward_update}_en${ensemble_size}_sample${feed_type}_large_batch${large_batch}_seed${seed}
+        dir: ./exp/${hydra.exp_name}/${env}/H${diag_gaussian_actor.params.hidden_dim}_L${diag_gaussian_actor.params.hidden_depth}_lr${agent.params.actor_lr}/teacher${teacher.class}${teacher.params}/label_smooth_${label_margin}/schedule_${reward_schedule}/${experiment}_init${num_seed_steps}_unsup${num_unsup_steps}_train${num_train_steps}_inter${num_interact}_maxfeed${max_feedback}_seg${segment}_act${activation}_Rlr${reward_lr}_Rbatch${reward_batch}_Rupdate${reward_update}_en${ensemble_size}_sample${feed_type}_large_batch${large_batch}_seed${seed}
