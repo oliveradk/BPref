@@ -173,11 +173,9 @@ class Workspace(object):
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
-        # get teacher
-        teacher = self.teachers.sample_teacher(sa_t_1, sa_t_2, info_t_1, info_t_2)
         
         # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = teacher.get_label(*queries)
+        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.teachers.get_labels(*queries)
         
         #  put querries
         if len(labels) > 0:
@@ -190,7 +188,7 @@ class Workspace(object):
         if self.labeled_feedback > 0:
             # update reward
             for epoch in range(self.cfg.reward_update):
-                if self.cfg.label_margin > 0 or teacher.eps_equal > 0:
+                if self.cfg.label_margin > 0:
                     train_acc = self.reward_model.train_soft_reward()
                 else:
                     train_acc = self.reward_model.train_reward()
@@ -347,7 +345,7 @@ class Workspace(object):
                                             gradient_update=1, K=self.cfg.topK)
             
             next_obs, reward, done, extra = self.env.step(action)
-            teacher_betas = [teacher.get_beta(np.concatenate([obs, action])[None, None, :], [[extra]]) for teacher in self.teachers.teachers]
+            teacher_betas = [teacher.get_beta(np.concatenate([obs, action])[None, :], [extra]) for teacher in self.teachers.teachers]
             reward_hat = self.reward_model.r_hat(np.concatenate([obs, action], axis=-1))
             
 

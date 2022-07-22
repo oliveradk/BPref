@@ -19,8 +19,8 @@ class StandardTeacher(Teacher):
         self.beta = beta
         super().__init__(ds, da, gamma, eps_mistake, eps_skip, eps_equal)
     
-    def get_beta(self, sa_t, info_t):
-        return np.ones((sa_t.shape[0], 1)) * self.beta
+    def get_beta(self, sa, info):
+        return self.beta
 
 
 class StandardTeachers(Teachers):

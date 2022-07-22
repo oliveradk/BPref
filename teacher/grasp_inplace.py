@@ -21,13 +21,13 @@ class GraspOnlyTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_beta(self, sa_t, info_t):
-        return np.ones((sa_t.shape[0], 1)) * self.beta
+    def get_beta(self, sa, info):
+        return self.beta
     
-    def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
-        grasp_r_t_1 = utils.get_partial_reward(info_t_1, 'grasp_reward')
-        grasp_r_t_2 = utils.get_partial_reward(info_t_2, 'grasp_reward')
-        return grasp_r_t_1, grasp_r_t_2
+    def process_reward(self, sa_1, sa_2, r_1, r_2, info_1, info_2):
+        grasp_r_1 = utils.get_partial_reward(info_1, 'grasp_reward')
+        grasp_r_2 = utils.get_partial_reward(info_2, 'grasp_reward')
+        return grasp_r_1, grasp_r_2
 
 class InPlaceOnlyTeacher(Teacher):
 
@@ -45,13 +45,13 @@ class InPlaceOnlyTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_beta(self, sa_t, info_t):
-        return np.ones((sa_t.shape[0], 1)) * self.beta
+    def get_beta(self, sa, info):
+        return self.beta
     
-    def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
-        grasp_r_t_1 = utils.get_partial_reward(info_t_1, 'in_place_reward')
-        grasp_r_t_2 = utils.get_partial_reward(info_t_2, 'in_place_reward')
-        return grasp_r_t_1, grasp_r_t_2
+    def process_reward(self, sa_1, sa_2, r_1, r_2, info_1, info_2):
+        grasp_r_1 = utils.get_partial_reward(info_1, 'in_place_reward')
+        grasp_r_2 = utils.get_partial_reward(info_2, 'in_place_reward')
+        return grasp_r_1, grasp_r_2
 
 class GraspingInPlaceOnlyTeachers(Teachers):
     def __init__(self,

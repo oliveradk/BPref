@@ -25,17 +25,10 @@ class GraspTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_beta(self, sa_t, info_t):
-        info = utils.get_info_lists(info_t, ['grasp_success'])
-        grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in info])
-
-
-        beta = np.zeros(grasp_mean.shape)
-        beta[grasp_mean <= self.grasp_thresh] = self.beta_1
-        beta[grasp_mean > self.grasp_thresh] = self.beta_2
-
-        beta = beta[:,None]
-
+    def get_beta(self, sa, info):
+        info_list_dict = utils.get_info_list(info, ['grasp_success'])
+        grasp_mean = np.mean(info_list_dict['grasp_success'])
+        beta = self.beta_1 if grasp_mean < self.grasp_thresh else self.beta_2
         return beta
 
 class NonGraspTeacher(Teacher):
@@ -58,16 +51,10 @@ class NonGraspTeacher(Teacher):
         self.ds = ds
         self.da = da
         
-    def get_beta(self, sa_t, info_t):
-        info = utils.get_info_lists(info_t, ['grasp_success'])
-        grasp_mean = np.array([np.mean(info_dict['grasp_success']) for info_dict in info])
-
-        beta = np.zeros(grasp_mean.shape)
-        beta[grasp_mean >= self.grasp_thresh] = self.beta_1
-        beta[grasp_mean < self.grasp_thresh] = self.beta_2
-
-        beta = beta[:,None]
-
+    def get_beta(self, sa, info):
+        info_list_dict = utils.get_info_list(info, ['grasp_success'])
+        grasp_mean = np.mean(info_list_dict['grasp_success'])
+        beta = self.beta_2 if grasp_mean < self.grasp_thresh else self.beta_1
         return beta
 
 class GraspingTeachers(Teachers):

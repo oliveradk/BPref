@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+import utils
+
 class Teacher():
     def __init__(self,
         ds,
@@ -33,22 +35,48 @@ class Teacher():
     def set_thres_equal(self, new_margin):
         self.thres_equal = new_margin * self.eps_equal
     
-    def get_beta(self, sa_t, info_t):
+    def get_beta(self, sa, info):
         raise NotImplementedError
     
-    def process_reward(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
-        return r_t_1, r_t_2
+    def process_reward(self, sa_1, sa_2, r_1, r_2, info_1, info_2):
+        return r_1, r_2
 
-    def get_label(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
-        r_t_1, r_t_2 = self.process_reward(sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2)
-        
+
+class Teachers():
+    def __init__(self, teachers: List[Teacher], sampling='uniform'):
+        self.teachers = teachers
+        self.sampling = sampling
+    
+    def sample_teachers(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+        teachers = []
+        batch_size = sa_t_1.shape[0]
+        for i in range(batch_size):
+            sa_i_1 = sa_t_1[i]
+            sa_i_2 = sa_t_2[i]
+            info_i_1 = info_t_1[i]
+            info_i_2 = info_t_2[i]
+            teacher = self.sample_teacher(sa_i_1, sa_i_2, info_i_1, info_i_2)
+            teachers.append(teacher)
+        return teachers
+
+    
+    def get_labels(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+        # get teaches
+        teachers = self.sample_teachers(sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2)
+        # process rewards
+        r_ts = [teacher.process_reward(sa_t_1[i], sa_t_2[i], r_t_1[i], r_t_2[i], info_t_1[i], info_t_2[i]) \
+            for i, teacher in enumerate(teachers)]
+        r_t_1 = np.concatenate([r_t[0] for r_t in r_ts], axis=1).transpose(1, 0)[:, :, None]
+        r_t_2 = np.concatenate([r_t[1] for r_t in r_ts], axis=1).transpose(1, 0)[:, :, None]
         sum_r_t_1 = np.sum(r_t_1, axis=1)
         sum_r_t_2 = np.sum(r_t_2, axis=1)
         
         # skip the query
-        if self.thres_skip > 0: 
+        thresh_skip = np.array([teacher.thresh_skip for teacher in teachers])[:, None]
+        if thresh_skip.sum() > 0:
             max_r_t = np.maximum(sum_r_t_1, sum_r_t_2)
-            max_index = (max_r_t > self.thres_skip).reshape(-1)
+            assert max_r_t.shape == thresh_skip.shape
+            max_index = (max_r_t > thresh_skip).reshape(-1)
             if sum(max_index) == 0:
                 return None, None, None, None, []
 
@@ -58,30 +86,34 @@ class Teacher():
             r_t_2 = r_t_2[max_index]
             sum_r_t_1 = np.sum(r_t_1, axis=1)
             sum_r_t_2 = np.sum(r_t_2, axis=1)
-        
+            teachers = [teachers[i] for i in range(len(teachers)) if max_index[i]]
+    
         # equally preferable
-        margin_index = (np.abs(sum_r_t_1 - sum_r_t_2) < self.thres_equal).reshape(-1)
+        eps_equal = np.array([teacher.eps_equal for teacher in teachers])[:, None]
+        assert sum_r_t_1.shape == eps_equal.shape
+        margin_index = (np.abs(sum_r_t_1 - sum_r_t_2) < eps_equal).reshape(-1)
         
         # perfectly rational
         seg_size = r_t_1.shape[1]
         temp_r_t_1 = r_t_1.copy()
         temp_r_t_2 = r_t_2.copy()
+        gamma = np.array([teacher.gamma for teacher in teachers])[:, None, None]
         for index in range(seg_size-1):
-            temp_r_t_1[:,:index+1] *= self.gamma
-            temp_r_t_2[:,:index+1] *= self.gamma
+            assert len(gamma.shape) == len(temp_r_t_1[:,:index+1].shape)
+            temp_r_t_1[:,:index+1] = (temp_r_t_1[:,:index+1] * gamma)
+            temp_r_t_2[:,:index+1]  = (temp_r_t_2[:,:index+1] * gamma)
         sum_r_t_1 = np.sum(temp_r_t_1, axis=1)
         sum_r_t_2 = np.sum(temp_r_t_2, axis=1)
             
-        
         # Bradley-Terry rational model #TODO: allow for -beta to be perfect rationality
-        beta_1 = self.get_beta(sa_t_1, info_t_1)
-        beta_2 = self.get_beta(sa_t_2, info_t_2)
-       
-        beta = np.mean([beta_1, beta_2], axis=0)
+        beta_1 = np.array([teacher.get_beta(sa_t_1[i], info_t_1[i]) for i, teacher in enumerate(teachers)])[:, None]
+        beta_2 = np.array([teacher.get_beta(sa_t_2[i], info_t_2[i]) for i, teacher in enumerate(teachers)])[:, None]
+        betas = np.concatenate([beta_1, beta_2], axis=1)
+        beta = np.mean(betas, axis=1)[:, None]
 
         assert sum_r_t_1.shape == beta.shape
         assert sum_r_t_2.shape == beta.shape
-
+        
         r_hat = torch.cat([torch.Tensor(sum_r_t_1), 
                             torch.Tensor(sum_r_t_2)], axis=-1)
         r_hat = r_hat * beta
@@ -91,38 +123,15 @@ class Teacher():
         # making a mistake
         len_labels = labels.shape[0]
         rand_num = np.random.rand(len_labels)
-        noise_index = rand_num <= self.eps_mistake
+        eps_mistake = np.array([teacher.eps_mistake for teacher in teachers])
+        assert rand_num.shape == eps_mistake.shape 
+        noise_index = rand_num <= eps_mistake
         labels[noise_index] = 1 - labels[noise_index]
  
         # equally preferable
         labels[margin_index] = -1 
         
         return sa_t_1, sa_t_2, r_t_1, r_t_2, labels
-
-class Teachers():
-    def __init__(self, teachers: List[Teacher], sampling='uniform'):
-        self.teachers = teachers
-        self.sampling = sampling
-    
-    def sample_teacher(self, sa_t_1, sa_t_2, info_t_1, info_t_2):
-        if self.sampling == 'uniform':
-            return self.uniform_sampling(sa_t_1, sa_t_2, info_t_1, info_t_2)
-        elif self.sampling == 'max_beta':
-            return self.max_beta(sa_t_1, sa_t_2, info_t_1, info_t_2)
-        else: 
-            raise ValueError(f"invalid teacher sampling method {self.sampling}")
-    
-    def uniform_sampling(self, sa_t_1, sa_t_2, info_t_1, info_t_2):
-        return random.choice(self.teachers)
-    
-    def max_beta(self, sa_t_1, sa_t_2, info_t_1, info_t_2):
-        betas = []
-        for teacher in self.teachers:
-            beta_1 = teacher.get_beta(sa_t_1, info_t_1)
-            beta_2 = teacher.get_beta(sa_t_2, info_t_2)
-            beta_sum_mean = (beta_1 + beta_2).mean()
-            betas.append(beta_sum_mean)
-        return self.teachers[np.argmax(betas)]
 
 
     def set_teacher_thres_skip(self, new_margin):
@@ -136,3 +145,23 @@ class Teachers():
     def set_env(self, env, log_dir=None):
         for teacher in self.teachers:
             teacher.set_env(env)
+    
+    def sample_teacher(self, sa_1, sa_2, info_1, info_2):
+        if self.sampling == 'uniform':
+            return self.uniform_sampling(sa_1, sa_2, info_1, info_2)
+        elif self.sampling == 'max_beta':
+            return self.max_beta_sampling(sa_1, sa_2, info_1, info_2)
+        else: 
+            raise ValueError(f"invalid teacher sampling method {self.sampling}")
+    
+    def uniform_sampling(self, sa_1, sa_2, info_1, info_2):
+        return random.choice(self.teachers)
+    
+    def max_beta_sampling(self, sa_1, sa_2, info_1, info_2):
+        betas = []
+        for teacher in self.teachers:
+            beta_1 = teacher.get_beta(sa_1, info_1)
+            beta_2 = teacher.get_beta(sa_2, info_2)
+            beta_sum = beta_1 + beta_2
+            betas.append(beta_sum)
+        return self.teachers[np.argmax(betas)]

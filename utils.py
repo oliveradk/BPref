@@ -306,22 +306,20 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True, log_obs=
         frames = frames.permute(0, 1, 4, 2, 3)
         writer.add_video(f'{tag}/video', frames, step, fps=30)
 
-def get_info_lists(info_t, keys):
-    info_lists = []
-    for dict_list in info_t: # each list of dicts in info_t
-        new_dict = {key: [] for key in keys}
-        for info_dict in dict_list:
-            for key in keys:
-                new_dict[key].append(info_dict[key])
-        info_lists.append(new_dict)
-    return info_lists
 
-def get_partial_reward(info_t, reward_key):
-    info = get_info_lists(info_t, [reward_key])
+def get_info_list(info, keys):
+    list_dict = {key: [] for key in keys}
+    for info_dict in info:
+        for key in keys:
+            list_dict[key].append(info_dict[key])
+    return list_dict
 
-    rew = [el[reward_key] for el in info]
 
-    return np.array(rew)[:,:,None]
+def get_partial_reward(info, reward_key):
+    info_list_dict = get_info_list(info, [reward_key])
+    rew = info_list_dict[reward_key]
+    return np.array(rew)[:, None]
+
 
 def box_vol(box):
     widths = box_widths(box)
@@ -358,3 +356,6 @@ def apply_map(func, l):
 
 def remove_duplicates(df):
     return df.loc[:, ~df.columns.duplicated()]
+
+def attr_arr(ls, attr):
+    return np.array([getattr(el, attr) for el in ls])

@@ -195,11 +195,9 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
 
-        # get teacher
-        teacher = self.teachers.sample_teacher(sa_t_1, sa_t_2, info_t_1, info_t_2)
 
         # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = teacher.get_label(*queries)
+        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.teachers.get_labels(*queries)
 
         
         #  put querries
@@ -211,10 +209,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         
         # update reward
         for epoch in range(self.re_update):
-            if teacher.eps_equal > 0:
-                train_acc = self.reward_model.train_soft_reward()
-            else:
-                train_acc = self.reward_model.train_reward()
+            train_acc = self.reward_model.train_reward()
             total_acc = np.mean(train_acc)
             
             if total_acc > 0.97:

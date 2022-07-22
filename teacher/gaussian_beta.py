@@ -40,10 +40,10 @@ class GaussianBetaTeacher(Teacher):
         self.beta_func = beta_func
         self.obs_mask = obs_mask
     
-    def get_beta(self, sa_t, info_t):
-        s = sa_t[:, :, :self.ds]
-        p_s = s[:, :, self.obs_mask]
-        return self.beta_func(p_s).mean(axis=1)[:, None]
+    def get_beta(self, sa, info):
+        s = sa[:, :self.ds]
+        p_s = s[:, self.obs_mask]
+        return self.beta_func(p_s).mean()
     
 
 class GaussianBetaTeachers(Teachers):
