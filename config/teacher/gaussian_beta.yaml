@@ -11,4 +11,5 @@ teacher:
         eps_equal: 0
         width_divisor: 2
         beta_scale: 200
+        divide: False
         sampling: uniform

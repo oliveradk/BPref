@@ -61,11 +61,13 @@ class GaussianBetaTeachers(Teachers):
         eps_equal,
         width_divisor,
         beta_scale,
+        divide, 
         sampling
     ):
         self.n_teachers = n_teachers
         self.width_divisor = width_divisor
         self.beta_scale = beta_scale
+        self.divide = divide
         self.params = {
             'ds': ds, 
             'da': da, 
@@ -88,8 +90,11 @@ class GaussianBetaTeachers(Teachers):
         # return utils.strata_width(strata)
 
     def get_scale(self, vol):
-        # return self.beta_scale * vol
-        return (self.beta_scale * vol) /self.n_teachers
+        if self.divide:
+            scale = (self.beta_scale * vol) / self.n_teachers
+        else:
+            scale = self.beta_scale * vol
+        return scale
     
     def define_teachers(self, obs_space, duplicates=False, log_dir=None):
         #preprocess environment space (remove duplicate and zero dimensions, normalize?)

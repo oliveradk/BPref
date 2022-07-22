@@ -25,9 +25,17 @@ fi
 
 . ./tests/run_PEBBLE_metaworld_gaussian_beta.sh
 if [ $? -eq 0 ]; then
-     echo "PEBBLE metaworld gaussian"
+     echo "PEBBLE metaworld gaussian succeeded"
 else
-    echo "PEBBLE metaworld gaussian"
+    echo "PEBBLE metaworld gaussian failed"
+    exit 1
+fi
+
+. ./tests/run_PEBBLE_metaworld_gaussian_beta_divide.sh
+if [ $? -eq 0 ]; then
+     echo "PEBBLE metaworld gaussian divide succeeded"
+else
+    echo "PEBBLE metaworld gaussian failed"
     exit 1
 fi
 
