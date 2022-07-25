@@ -238,7 +238,8 @@ class Workspace(object):
 
                 # log teacher betas
                 if len(betas) > 0:
-                    self.logger.log('train/beta_min', np.array(betas).min(), self.step)
+                    self.logger.log('train/beta_min_mean', np.array([min(beta_t) for beta_t in betas]).mean(), self.step)
+                    self.logger.log('train/beta_max_mean', np.array([max(beta_t) for beta_t in betas]).mean(), self.step)
                     self.logger.log('train/beta_mean', np.array(betas).mean(), self.step)
                 
                 if self.log_success:
