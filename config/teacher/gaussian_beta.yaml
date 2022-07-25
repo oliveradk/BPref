@@ -9,7 +9,7 @@ teacher:
         eps_mistake: 0
         eps_skip: 0
         eps_equal: 0
-        width_divisor: 2
-        beta_scale: 200
+        width_divisor: 16
+        beta_scale: 1
         divide: False
         sampling: uniform
