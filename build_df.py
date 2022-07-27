@@ -61,7 +61,10 @@ def build_df(filter_funcs, events):
             raise ValueError("No filters for multiple events")
         return event_to_df(events[0])
     
+    # get values of filter
     filter_vals = utils.apply_map(filter_funcs[0], events)
+
+    # dict with unique filters as keys, list of events that share filter value as value
     event_filter_pairs = list(zip(events, filter_vals))
     event_groups = {filter_val: [pair[0] for pair in event_filter_pairs if pair[1] == filter_val] for filter_val in set(filter_vals)}
     df_dict = {}
@@ -73,11 +76,17 @@ def build_df(filter_funcs, events):
 
 ### filters ### 
 
-def teacher_param_filter(x, teacher_param):
+def teacher_int_param_filter(x, teacher_param):
      return re.search(f"(?<={teacher_param}': )\d+", x).group(0)
 
+def teacher_str_param_filter(x, teacher_param):
+    return re.search(f"(?<={teacher_param}': )'\w+'", x).group(0).replace("'", "")
+
 def n_teacher_filter(x):
-    return teacher_param_filter(x, 'n_teachers')
+    return teacher_int_param_filter(x, 'n_teachers')
+
+def teacher_sampling_filter(x):
+    return teacher_str_param_filter(x, 'sampling')
 
 def seed_filter(x):
     return re.search("(?<=seed)\d+", x).group(0)
@@ -85,12 +94,13 @@ def seed_filter(x):
 def gaussian_beta_filter(x):
     return 'GaussianBetaTeachers' in x
 
+
 def get_events_in_matching(root_dir, filter):
     events = []
-    for path in os.listdir(root_dir):
-        full_path = os.path.join(root_dir, path)
-        if os.path.isdir(os.path.join(full_path)) and filter(full_path):
-            events += get_config_events(os.path.join(full_path))
+    for root, dirs, files in os.walk(root_dir):
+        for d in dirs:
+            if filter(d):
+                events += get_config_events(os.path.join(root, d))
     return events
 
 
