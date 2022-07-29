@@ -8,30 +8,6 @@ import utils
 from teacher import Teacher, Teachers
 
 
-
-
-class PowerDist():
-    def __init__(self, base, center, width, scale, box):
-        self.base = base
-        self.box_widths = utils.box_widths(box)
-        self.box_min = box.low
-        self.center = center
-        self.width = width
-        self.scale = scale
-        d = center.shape[0]
-    
-    def __call__(self, obs):
-        obs = (obs + self.box_min) / self.box_widths # normalize
-        
-        N = obs.shape[0]
-        mu = self.center
-        sigma = np.identity(N) * self.width
-        
-        temp1 = np.linalg.det(sigma) ** (-1/2)
-        temp2 = np.power(self.base, -.5 * (obs-mu).T @ np.linalg.inv(sigma) @ (obs-mu))
-        
-        return (2 * np.pi) ** (-N/2) * temp1 * temp2
-
 class Gaussian:
     def __init__(self, center, width, scale, box):
         self.box_widths = utils.box_widths(box)
