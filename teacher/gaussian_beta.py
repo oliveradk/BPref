@@ -8,15 +8,42 @@ import utils
 from teacher import Teacher, Teachers
 
 
-class Gaussian:
-    def __init__(self, center, width, scale):
+
+
+class PowerDist():
+    def __init__(self, base, center, width, scale, box):
+        self.base = base
+        self.box_widths = utils.box_widths(box)
+        self.box_min = box.low
         self.center = center
         self.width = width
         self.scale = scale
         d = center.shape[0]
-        self.var = multivariate_normal(mean=center, cov=np.identity(d) * width)
     
     def __call__(self, obs):
+        obs = (obs + self.box_min) / self.box_widths # normalize
+        
+        N = obs.shape[0]
+        mu = self.center
+        sigma = np.identity(N) * self.width
+        
+        temp1 = np.linalg.det(sigma) ** (-1/2)
+        temp2 = np.power(self.base, -.5 * (obs-mu).T @ np.linalg.inv(sigma) @ (obs-mu))
+        
+        return (2 * np.pi) ** (-N/2) * temp1 * temp2
+
+class Gaussian:
+    def __init__(self, center, width, scale, box):
+        self.box_widths = utils.box_widths(box)
+        self.box_min = box.low
+        self.center = center
+        self.width = width
+        self.scale = scale
+        d = center.shape[0]
+        self.var = multivariate_normal(mean=center, cov=np.identity(d) * self.width)
+    
+    def __call__(self, obs):
+        obs = (obs - self.box_min) / self.box_widths # normalize
         density = self.scale * self.var.pdf(obs)
         return density.reshape(obs.shape[:-1]) # readd empty dimensions
     
@@ -61,13 +88,15 @@ class GaussianBetaTeachers(Teachers):
         eps_equal,
         width_divisor,
         beta_scale,
-        divide, 
+        divide,
+        strata_width, 
         sampling
     ):
         self.n_teachers = n_teachers
         self.width_divisor = width_divisor
         self.beta_scale = beta_scale
         self.divide = divide
+        self.strata_width = strata_width
         self.params = {
             'ds': ds, 
             'da': da, 
@@ -86,8 +115,10 @@ class GaussianBetaTeachers(Teachers):
         # return stratified_sampling(strata)
     
     def get_widths(self, strata, box):
-        return [utils.box_widths(box)] * len(strata)
-        # return utils.strata_width(strata)
+        if self.strata_width:
+            return utils.strata_width(strata)
+        else:
+            return [utils.box_widths(box)] * len(strata)
 
     def get_scale(self, vol):
         if self.divide:
@@ -97,22 +128,22 @@ class GaussianBetaTeachers(Teachers):
         return scale
     
     def define_teachers(self, obs_space, duplicates=False, log_dir=None):
-        #preprocess environment space (remove duplicate and zero dimensions, normalize?)
-        box, obs_mask = self._process_obs_space(obs_space, duplicates=duplicates)
-        vol = utils.box_vol(box)
+        #preprocess environment space (remove duplicate and zero dimensions, normalize)
+        box, obs_mask, norm_box = self._process_obs_space(obs_space, duplicates=duplicates)
+        vol = utils.box_vol(norm_box)
         #partition envionment space into n strata (don't need actual enviornment, only observation_space)
         strata = stratify_generalized(
-            self.n_teachers, box.shape[0],  
-            cuboid=(box.low.tolist(), box.high.tolist())
+            self.n_teachers, norm_box.shape[0],  
+            cuboid=(norm_box.low.tolist(), norm_box.high.tolist())
         )
         #get center of each strata
-        points = self.get_points(strata, box)
+        points = self.get_points(strata, norm_box)
         #calculate strata width for each
-        strata_widths = self.get_widths(strata, box)
+        strata_widths = self.get_widths(strata, norm_box)
         
         scale = self.get_scale(vol)
         for i in range(self.n_teachers):
-            beta_func = Gaussian(points[i], strata_widths[i]/self.width_divisor, scale)
+            beta_func = Gaussian(points[i], strata_widths[i]/self.width_divisor, scale, box)
             teacher = GaussianBetaTeacher(
                 ds=self.params['ds'],
                 da=self.params['da'],
@@ -157,5 +188,7 @@ class GaussianBetaTeachers(Teachers):
         #create new (processed) box
         p_box = Box(low=obs_space.low[obs_mask], high=obs_space.high[obs_mask])
 
-        return p_box, obs_mask
+        norm_box = Box(np.zeros(p_box.shape[0]), np.ones(p_box.shape[0]))
+
+        return p_box, obs_mask, norm_box
 

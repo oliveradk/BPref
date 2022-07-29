@@ -12,4 +12,5 @@ teacher:
         width_divisor: 16
         beta_scale: 1
         divide: False
+        strata_width: False
         sampling: uniform
