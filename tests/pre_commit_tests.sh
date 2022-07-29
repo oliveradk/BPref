@@ -70,3 +70,11 @@ else
     echo "PrefPPo dmc failed" 
     exit 1
 fi
+
+. ./tests/run_PEBBLE_metaworld_box_beta.sh
+if [ $? -eq 0 ]; then 
+    echo "PEBBLE box beta succeeded" 
+else
+    echo "PEBBLE box beta failed" 
+    exit 1
+fi
