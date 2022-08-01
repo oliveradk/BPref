@@ -13,4 +13,3 @@ teacher:
         beta_scale: 1
         divide: False
         strata_width: False
-        sampling: uniform

@@ -12,4 +12,3 @@ teacher:
         beta_high: 1
         beta_low: 0.1
         scale: True
-        sampling: uniform

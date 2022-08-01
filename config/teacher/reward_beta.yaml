@@ -10,4 +10,3 @@ teacher:
         eps_mistake: 0
         eps_skip: 0
         eps_equal: 0
-        sampling: uniform

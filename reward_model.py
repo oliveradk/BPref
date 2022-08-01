@@ -11,6 +11,7 @@ import scipy.stats as st
 import os
 import time
 from itertools import chain
+import random
 
 from scipy.stats import norm
 
@@ -86,11 +87,7 @@ class RewardModel:
     def __init__(self, ds, da, 
                  ensemble_size=3, lr=3e-4, mb_size = 128, size_segment=1, 
                  env_maker=None, max_size=100, activation='tanh', capacity=5e5,  
-                 large_batch=1, label_margin=0.0, 
-                 teacher_beta=-1, teacher_gamma=1, 
-                 teacher_eps_mistake=0, 
-                 teacher_eps_skip=0, 
-                 teacher_eps_equal=0):
+                 large_batch=1, label_margin=0.0, teacher_selection='uniform'):
         
         # train data is trajectories, must process to sa and s..   
         self.ds = ds
@@ -109,6 +106,7 @@ class RewardModel:
         self.buffer_seg1 = np.empty((self.capacity, size_segment, self.ds+self.da), dtype=np.float32)
         self.buffer_seg2 = np.empty((self.capacity, size_segment, self.ds+self.da), dtype=np.float32)
         self.buffer_label = np.empty((self.capacity, 1), dtype=np.float32)
+        self.buffer_teacher = np.empty((self.capacity, 1), dtype=np.int8)
         self.buffer_index = 0
         self.buffer_full = False
                 
@@ -128,6 +126,8 @@ class RewardModel:
         self.best_label = []
         self.best_action = []
         self.large_batch = large_batch
+
+        self.teacher_selection = teacher_selection
         
         self.label_margin = label_margin
         self.label_target = 1 - 2*self.label_margin
@@ -348,7 +348,7 @@ class RewardModel:
                 
         return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
 
-    def put_queries(self, sa_t_1, sa_t_2, labels):
+    def put_queries(self, sa_t_1, sa_t_2, labels, teachers):
         total_sample = sa_t_1.shape[0]
         next_index = self.buffer_index + total_sample
         if next_index >= self.capacity:
@@ -357,18 +357,21 @@ class RewardModel:
             np.copyto(self.buffer_seg1[self.buffer_index:self.capacity], sa_t_1[:maximum_index])
             np.copyto(self.buffer_seg2[self.buffer_index:self.capacity], sa_t_2[:maximum_index])
             np.copyto(self.buffer_label[self.buffer_index:self.capacity], labels[:maximum_index])
+            np.copyto(self.buffer_teacher[self.buffer_index:self.capacity], teachers[:maximum_index])
 
             remain = total_sample - (maximum_index)
             if remain > 0:
                 np.copyto(self.buffer_seg1[0:remain], sa_t_1[maximum_index:])
                 np.copyto(self.buffer_seg2[0:remain], sa_t_2[maximum_index:])
                 np.copyto(self.buffer_label[0:remain], labels[maximum_index:])
+                np.copyto(self.buffer_teacher[0:remain], teachers[maximum_index:])
 
             self.buffer_index = remain
         else:
             np.copyto(self.buffer_seg1[self.buffer_index:next_index], sa_t_1)
             np.copyto(self.buffer_seg2[self.buffer_index:next_index], sa_t_2)
             np.copyto(self.buffer_label[self.buffer_index:next_index], labels)
+            np.copyto(self.buffer_teacher[self.buffer_index:next_index], teachers)
             self.buffer_index = next_index
             
     def kcenter_sampling(self):
@@ -548,6 +551,7 @@ class RewardModel:
                 sa_t_1 = self.buffer_seg1[idxs]
                 sa_t_2 = self.buffer_seg2[idxs]
                 labels = self.buffer_label[idxs]
+                teachers = self.buffer_teacher[idxs]
                 labels = torch.from_numpy(labels.flatten()).long().to(device)
                 
                 if member == 0:
@@ -577,6 +581,39 @@ class RewardModel:
         
         return ensemble_acc
     
+    def select_teachers(self, teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+        batch_size = sa_t_1.shape[0]
+        teacher_ids = np.empty((batch_size, 1), dtype=np.int8)
+        for i in range(batch_size):
+            sa_i_1 = sa_t_1[i]
+            sa_i_2 = sa_t_2[i]
+            info_i_1 = info_t_1[i]
+            info_i_2 = info_t_2[i]
+            teacher_id = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2)
+            teacher_ids[i] = teacher_id
+        return teacher_ids
+    
+    def select_teacher(self, teachers, sa_1, sa_2, info_1, info_2):
+        if self.teacher_selection == 'uniform':
+            return self.uniform_selection(teachers, sa_1, sa_2, info_1, info_2)
+        elif self.teacher_selection == 'max_beta':
+            return self.max_beta_selection(teachers, sa_1, sa_2, info_1, info_2)
+        else: 
+            raise NotImplementedError
+    
+    def uniform_selection(self, teachers, sa_1, sa_2, info_1, info_2):
+        return random.randrange(0, len(teachers))
+    
+    def max_beta_selection(self, teachers, sa_1, sa_2, info_1, info_2):
+        betas = []
+        for teacher in teachers:
+            beta_1 = teacher.get_beta(sa_1, info_1)
+            beta_2 = teacher.get_beta(sa_2, info_2)
+            beta_sum = beta_1 + beta_2
+            betas.append(beta_sum)
+        return np.argmax(betas)
+
+    
     def train_soft_reward(self):
         ensemble_losses = [[] for _ in range(self.de)]
         ensemble_acc = np.array([0 for _ in range(self.de)])
@@ -605,6 +642,7 @@ class RewardModel:
                 sa_t_1 = self.buffer_seg1[idxs]
                 sa_t_2 = self.buffer_seg2[idxs]
                 labels = self.buffer_label[idxs]
+                teachers = self.buffer_teacher[idxs]
                 labels = torch.from_numpy(labels.flatten()).long().to(device)
                 
                 if member == 0:

@@ -68,7 +68,6 @@ class GraspingTeachers(Teachers):
         eps_mistake,
         eps_skip,
         eps_equal,
-        sampling
     ):
         n=2
         gamma = utils.extend_param(gamma, n)
@@ -82,4 +81,4 @@ class GraspingTeachers(Teachers):
         nongrasp_teacher = NonGraspTeacher(beta_1[1], beta_2[1], grasp_thresh, 
             ds, da, gamma[1], eps_mistake[1], eps_skip[1], eps_equal[1])
         
-        super().__init__([grasp_teacher, nongrasp_teacher], sampling=sampling)
+        super().__init__([grasp_teacher, nongrasp_teacher])

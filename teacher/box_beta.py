@@ -50,7 +50,6 @@ class BoxBetaTeachers(Teachers):
         beta_high,
         beta_low,
         scale,
-        sampling
     ):
         self.n_teachers = n_teachers
         self.scale = scale
@@ -63,7 +62,7 @@ class BoxBetaTeachers(Teachers):
             'eps_mistake': utils.extend_param(eps_mistake, self.n_teachers),
             'eps_skip': utils.extend_param(eps_skip, self.n_teachers), 
             'eps_equal': utils.extend_param(eps_equal, self.n_teachers)}
-        super().__init__(teachers=[], sampling=sampling)
+        super().__init__(teachers=[])
     
     def set_env(self, env, log_dir=None):
         self.define_teachers(env.observation_space)

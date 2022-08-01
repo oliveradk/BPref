@@ -195,14 +195,17 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
 
+        teacher_ids = self.reward_model.select_teachers(
+            self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, 
+            info_t_2)
 
         # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.teachers.get_labels(*queries)
+        sa_t_1, sa_t_2, r_t_1, r_t_2, labels, teacher_ids = \
+            self.teachers.get_labels(teacher_ids, *queries)
 
-        
         #  put querries
         if len(labels) > 0:
-            self.reward_model.put_queries(sa_t_1, sa_t_2, labels)
+            self.reward_model.put_queries(sa_t_1, sa_t_2, labels, teacher_ids)
 
         self.total_feed += self.reward_model.mb_size
         self.labeled_feedback += len(labels)

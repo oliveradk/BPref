@@ -39,8 +39,7 @@ class RewardBetaTeachers(Teachers):
         gamma,
         eps_mistake,
         eps_skip,
-        eps_equal,
-        sampling
+        eps_equal
     ):
         self.reward_keys = reward_keys
         n = len(self.reward_keys)
@@ -55,4 +54,4 @@ class RewardBetaTeachers(Teachers):
             teacher = RewardBetaTeacher(reward_key, ds, da, beta_scale[i], 
             gamma[i], eps_mistake[i], eps_skip[i], eps_equal[i])
             teachers.append(teacher)
-        super().__init__(teachers, sampling=sampling)
+        super().__init__(teachers)

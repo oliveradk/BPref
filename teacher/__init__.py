@@ -47,22 +47,9 @@ class Teachers():
         self.teachers = teachers
         self.sampling = sampling
     
-    def sample_teachers(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
-        teachers = []
-        batch_size = sa_t_1.shape[0]
-        for i in range(batch_size):
-            sa_i_1 = sa_t_1[i]
-            sa_i_2 = sa_t_2[i]
-            info_i_1 = info_t_1[i]
-            info_i_2 = info_t_2[i]
-            teacher = self.sample_teacher(sa_i_1, sa_i_2, info_i_1, info_i_2)
-            teachers.append(teacher)
-        return teachers
-
-    
-    def get_labels(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+    def get_labels(self, teacher_ids, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
         # get teaches
-        teachers = self.sample_teachers(sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2)
+        teachers = [self.teachers[int(i)] for i in teacher_ids]
         # process rewards
         r_ts = [teacher.process_reward(sa_t_1[i], sa_t_2[i], r_t_1[i], r_t_2[i], info_t_1[i], info_t_2[i]) \
             for i, teacher in enumerate(teachers)]
@@ -86,7 +73,8 @@ class Teachers():
             r_t_2 = r_t_2[max_index]
             sum_r_t_1 = np.sum(r_t_1, axis=1)
             sum_r_t_2 = np.sum(r_t_2, axis=1)
-            teachers = [teachers[i] for i in range(len(teachers)) if max_index[i]]
+            teacher_ids = teacher_ids[max_index]
+            teachers = [teachers[int(i)] for i in teacher_ids]
     
         # equally preferable
         eps_equal = np.array([teacher.eps_equal for teacher in teachers])[:, None]
@@ -131,7 +119,7 @@ class Teachers():
         # equally preferable
         labels[margin_index] = -1 
         
-        return sa_t_1, sa_t_2, r_t_1, r_t_2, labels
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, labels, teacher_ids
 
 
     def set_teacher_thres_skip(self, new_margin):
@@ -145,23 +133,3 @@ class Teachers():
     def set_env(self, env, log_dir=None):
         for teacher in self.teachers:
             teacher.set_env(env)
-    
-    def sample_teacher(self, sa_1, sa_2, info_1, info_2):
-        if self.sampling == 'uniform':
-            return self.uniform_sampling(sa_1, sa_2, info_1, info_2)
-        elif self.sampling == 'max_beta':
-            return self.max_beta_sampling(sa_1, sa_2, info_1, info_2)
-        else: 
-            raise ValueError(f"invalid teacher sampling method {self.sampling}")
-    
-    def uniform_sampling(self, sa_1, sa_2, info_1, info_2):
-        return random.choice(self.teachers)
-    
-    def max_beta_sampling(self, sa_1, sa_2, info_1, info_2):
-        betas = []
-        for teacher in self.teachers:
-            beta_1 = teacher.get_beta(sa_1, info_1)
-            beta_2 = teacher.get_beta(sa_2, info_2)
-            beta_sum = beta_1 + beta_2
-            betas.append(beta_sum)
-        return self.teachers[np.argmax(betas)]

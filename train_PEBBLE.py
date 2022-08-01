@@ -75,7 +75,8 @@ class Workspace(object):
             lr=cfg.reward_lr,
             mb_size=cfg.reward_batch, 
             large_batch=cfg.large_batch, 
-            label_margin=cfg.label_margin)
+            label_margin=cfg.label_margin,
+            teacher_selection=cfg.teacher_selection)
         
         #instantiate the teaches
         cfg.teacher.params.ds = self.env.observation_space.shape[0]
@@ -173,13 +174,17 @@ class Workspace(object):
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
-        
-        # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.teachers.get_labels(*queries)
+
+        teacher_ids = self.reward_model.select_teachers(
+            self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, 
+            info_t_2)
+    
+        sa_t_1, sa_t_2, r_t_1, r_t_2, labels, teacher_ids = \
+            self.teachers.get_labels(teacher_ids, *queries)
         
         #  put querries
         if len(labels) > 0:
-            self.reward_model.put_queries(sa_t_1, sa_t_2, labels)
+            self.reward_model.put_queries(sa_t_1, sa_t_2, labels, teacher_ids)
         
         self.total_feedback += self.reward_model.mb_size
         self.labeled_feedback += len(labels)
@@ -240,6 +245,7 @@ class Workspace(object):
                 if len(betas) > 0:
                     self.logger.log('train/beta_min_mean', np.array([min(beta_t) for beta_t in betas]).mean(), self.step)
                     self.logger.log('train/beta_max_mean', np.array([max(beta_t) for beta_t in betas]).mean(), self.step)
+                    self.logger.log('train/beta_median_mean', np.array([np.median(beta_t) for beta_t in betas]).mean(), self.step)
                     self.logger.log('train/beta_mean', np.array(betas).mean(), self.step)
                 
                 if self.log_success:

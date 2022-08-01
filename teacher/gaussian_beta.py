@@ -66,7 +66,6 @@ class GaussianBetaTeachers(Teachers):
         beta_scale,
         divide,
         strata_width, 
-        sampling
     ):
         self.n_teachers = n_teachers
         self.width_divisor = width_divisor
@@ -80,7 +79,7 @@ class GaussianBetaTeachers(Teachers):
             'eps_mistake': utils.extend_param(eps_mistake, self.n_teachers),
             'eps_skip': utils.extend_param(eps_skip, self.n_teachers), 
             'eps_equal': utils.extend_param(eps_equal, self.n_teachers)}
-        super().__init__(teachers=[], sampling=sampling)
+        super().__init__(teachers=[])
     
     def set_env(self, env, log_dir=None):
         self.define_teachers(env.observation_space, log_dir=log_dir)
