@@ -20,7 +20,7 @@ class StandardTeacher(Teacher):
         super().__init__(ds, da, gamma, eps_mistake, eps_skip, eps_equal)
     
     def get_beta(self, sa, info):
-        return self.beta
+        return float(self.beta)
 
 
 class StandardTeachers(Teachers):

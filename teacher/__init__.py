@@ -43,9 +43,8 @@ class Teacher():
 
 
 class Teachers():
-    def __init__(self, teachers: List[Teacher], sampling='uniform'):
+    def __init__(self, teachers: List[Teacher]):
         self.teachers = teachers
-        self.sampling = sampling
     
     def get_labels(self, teacher_ids, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
         # get teaches
@@ -93,20 +92,25 @@ class Teachers():
         sum_r_t_1 = np.sum(temp_r_t_1, axis=1)
         sum_r_t_2 = np.sum(temp_r_t_2, axis=1)
             
-        # Bradley-Terry rational model #TODO: allow for -beta to be perfect rationality
+        # Bradley-Terry rational model
         beta_1 = np.array([teacher.get_beta(sa_t_1[i], info_t_1[i]) for i, teacher in enumerate(teachers)])[:, None]
         beta_2 = np.array([teacher.get_beta(sa_t_2[i], info_t_2[i]) for i, teacher in enumerate(teachers)])[:, None]
         betas = np.concatenate([beta_1, beta_2], axis=1)
-        beta = np.mean(betas, axis=1)[:, None]
+        beta = np.mean(betas, axis=1)[:, None] #TODO: remove
 
         assert sum_r_t_1.shape == beta.shape
         assert sum_r_t_2.shape == beta.shape
-        
+
         r_hat = torch.cat([torch.Tensor(sum_r_t_1), 
-                            torch.Tensor(sum_r_t_2)], axis=-1)
-        r_hat = r_hat * beta
-        ent = F.softmax(r_hat, dim=-1)[:, 1]
-        labels = torch.bernoulli(ent).int().numpy().reshape(-1, 1)
+                    torch.Tensor(sum_r_t_2)], axis=-1)
+        # perfectly rational and boltzman rational 
+        labels = torch.argmax(r_hat, dim=-1).int()
+        beta_idx = np.where(beta != np.inf)[0]
+        logits = r_hat[beta_idx] * beta[beta_idx]
+        ent = F.softmax(logits, dim=-1)[:, 1]
+        sampled_labels = torch.bernoulli(ent).int()
+        labels[beta_idx] = sampled_labels
+        labels = labels.numpy().reshape(-1, 1)
         
         # making a mistake
         len_labels = labels.shape[0]
