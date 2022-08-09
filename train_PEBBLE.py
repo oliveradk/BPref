@@ -18,6 +18,7 @@ from logger import Logger
 from replay_buffer import ReplayBuffer
 from reward_model import RewardModel
 from teacher import Teachers, Teacher
+from teacher.gaussian_beta import GaussianBetaTeachers
 import utils
 
 
@@ -59,11 +60,12 @@ class Workspace(object):
             self.env.action_space.shape,
             int(cfg.replay_buffer_capacity),
             self.device)
-        
-        # for logging
-        self.total_feedback = 0
-        self.labeled_feedback = 0
-        self.step = 0
+
+        #instantiate the teaches
+        cfg.teacher.params.ds = self.env.observation_space.shape[0]
+        cfg.teacher.params.da = self.env.action_space.shape[0]
+        self.teachers = hydra.utils.instantiate(cfg.teacher)
+        self.teachers.set_env(self.env, self.logger._log_dir)
 
         # instantiating the reward model
         self.reward_model = RewardModel(
@@ -76,14 +78,18 @@ class Workspace(object):
             mb_size=cfg.reward_batch, 
             large_batch=cfg.large_batch, 
             label_margin=cfg.label_margin,
-            teacher_selection=cfg.teacher_selection)
-        
-        #instantiate the teaches
-        cfg.teacher.params.ds = self.env.observation_space.shape[0]
-        cfg.teacher.params.da = self.env.action_space.shape[0]
-        self.teachers = hydra.utils.instantiate(cfg.teacher)
-        self.teachers.set_env(self.env, self.logger._log_dir)
-
+            teacher_selection=cfg.teacher_selection,
+            n_teachers=len(self.teachers),
+            beta_joint=cfg.beta_joint,
+            beta_obs_mask=self.teachers.obs_mask if \
+                isinstance(self.teachers, GaussianBetaTeachers) else None)
+             
+        # for logging
+        self.total_feedback = 0
+        self.labeled_feedback = 0
+        self.beta_acc = 0
+        self.mean_betas = np.zeros(len(self.teachers))
+        self.step = 0
         
     def evaluate(self):
         average_episode_reward = 0
@@ -174,8 +180,8 @@ class Workspace(object):
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
-
-        teacher_ids = self.reward_model.select_teachers(
+        
+        teacher_ids, beta_hats = self.reward_model.select_teachers(
             self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, 
             info_t_2)
     
@@ -185,10 +191,19 @@ class Workspace(object):
         #  put querries
         if len(labels) > 0:
             self.reward_model.put_queries(sa_t_1, sa_t_2, labels, teacher_ids)
-        
+         
         self.total_feedback += self.reward_model.mb_size
         self.labeled_feedback += len(labels)
         
+        # get max beta teachers
+        max_beta_teacher_ids, _ = self.reward_model.select_teachers(
+                                self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, 
+                                r_t_2, info_t_1, info_t_2, method='max_beta')
+        if beta_hats is not None:
+            max_beta_hat_teachers = np.argmax(beta_hats, axis=-1)
+            self.beta_acc = (max_beta_teacher_ids == max_beta_hat_teachers).mean()
+            self.mean_betas = beta_hats.mean(axis=0)
+        # compute max beta teacher selection accuracy
         train_acc = 0
         if self.labeled_feedback > 0:
             # update reward
@@ -202,7 +217,7 @@ class Workspace(object):
                 if total_acc > 0.97:
                     break;
                     
-        print("Reward function is updated!! ACC: " + str(total_acc))
+        print(f"Reward function is updated!! ACC: {str(total_acc)}")
 
     def run(self):
         episode, episode_reward, done = 0, 0, True
@@ -246,7 +261,15 @@ class Workspace(object):
                     self.logger.log('train/beta_min_mean', np.array([min(beta_t) for beta_t in betas]).mean(), self.step)
                     self.logger.log('train/beta_max_mean', np.array([max(beta_t) for beta_t in betas]).mean(), self.step)
                     self.logger.log('train/beta_median_mean', np.array([np.median(beta_t) for beta_t in betas]).mean(), self.step)
-                    self.logger.log('train/beta_mean', np.array(betas).mean(), self.step)
+                    beta_means = np.array(betas).mean(axis=0)
+                    for i in range(len(self.teachers.teachers)):
+                        self.logger.log(f'train/beta_{i}', beta_means[i], self.step)
+                
+                # log beta model stats
+                if self.reward_model.beta_model_used:
+                    self.logger.log('train/beta_model_acc', self.beta_acc, self.step)
+                    for i in range(self.reward_model.n_teachers):
+                        self.logger.log(f'train/beta_hat_{i}', self.mean_betas[i], self.step)
                 
                 if self.log_success:
                     self.logger.log('train/episode_success', episode_success,
@@ -354,6 +377,7 @@ class Workspace(object):
             next_obs, reward, done, extra = self.env.step(action)
             teacher_betas = [teacher.get_beta(np.concatenate([obs, action])[None, :], [extra]) for teacher in self.teachers.teachers]
             reward_hat = self.reward_model.r_hat(np.concatenate([obs, action], axis=-1))
+
             
 
             # allow infinite bootstrap

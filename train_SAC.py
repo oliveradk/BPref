@@ -41,7 +41,6 @@ class Workspace(object):
             self.log_info = True
         else:
             self.env = utils.make_env(cfg)
-
         cfg.agent.params.obs_dim = self.env.observation_space.shape[0]
         cfg.agent.params.action_dim = self.env.action_space.shape[0]
         cfg.agent.params.action_range = [

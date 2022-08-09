@@ -136,7 +136,13 @@ if __name__ == "__main__":
             n_envs=args.n_envs, 
             monitor_dir=args.tensorboard_log,
             seed=args.seed)
-            
+    
+    # instantiate teachers
+    teacher_cfg.teacher.params.ds = env.observation_space.shape[0]
+    teacher_cfg.teacher.params.da = env.action_space.shape[0]
+    teachers = hydra.utils.instantiate(teacher_cfg.teacher)
+    teachers.set_env(env)
+
     # instantiating the reward model
     reward_model = RewardModel(
         env.envs[0].observation_space.shape[0],
@@ -146,16 +152,13 @@ if __name__ == "__main__":
         lr=args.re_lr,
         mb_size=args.re_batch,
         large_batch=args.re_large_batch,
-        teacher_selection=args.re_teacher_select)
+        teacher_selection=args.re_teacher_select,
+        n_teachers=len(teachers))
     
     if args.normalize == 1:
         env = VecNormalize(env, norm_reward=False)
     
-    # instantiate teachers
-    teacher_cfg.teacher.params.ds = env.observation_space.shape[0]
-    teacher_cfg.teacher.params.da = env.action_space.shape[0]
-    teachers = hydra.utils.instantiate(teacher_cfg.teacher)
-    teachers.set_env(env)
+
     
     # network arch
     net_arch = [dict(pi=[args.hidden_dim]*args.num_layer, 

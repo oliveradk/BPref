@@ -28,10 +28,28 @@ def gen_net(in_size=1, out_size=1, H=128, n_layers=3, activation='tanh'):
         net.append(nn.Tanh())
     elif activation == 'sig':
         net.append(nn.Sigmoid())
+    elif activation == 'softplus':
+        net.append(nn.Softplus())
     else:
         net.append(nn.ReLU())
 
     return net
+
+class MultiHead(nn.Module):
+
+    def __init__(self, model, in_dim, out_dim, n_heads, activation='softplus'):
+        self.model = model
+        self.heads = [nn.Linear(in_dim, out_dim) for _ in range(n_heads)]
+        if activation == 'softplus':
+            self.activation = nn.Softplus()
+        else:
+            self.activation = nn.ReLU()
+    
+    def forward(self, x):
+        out = self.model(x)
+        outs = [self.activation(head(out)) for head in self.heads]
+        return outs
+
 
 def KCenterGreedy(obs, full_obs, num_new_sample):
     selected_index = []
@@ -84,10 +102,14 @@ def compute_smallest_dist(obs, full_obs):
     return total_dists.unsqueeze(1)
 
 class RewardModel:
-    def __init__(self, ds, da, 
+    def __init__(self, ds, da,
                  ensemble_size=3, lr=3e-4, mb_size = 128, size_segment=1, 
                  env_maker=None, max_size=100, activation='tanh', capacity=5e5,  
-                 large_batch=1, label_margin=0.0, teacher_selection='uniform'):
+                 large_batch=1, label_margin=0.0, teacher_selection='uniform',
+                 n_teachers=1, default_beta=1, beta_activation='softplus', 
+                 beta_eps=1e-1, beta_joint=False, beta_gaussian_used=False,
+                 beta_obs_mask=None): #TODO: mask obs (pass in train PEBBLE, use in constructing beta model, beta hat)
+                #TODO: include beta_eps in configs
         
         # train data is trajectories, must process to sa and s..   
         self.ds = ds
@@ -104,9 +126,10 @@ class RewardModel:
         
         self.capacity = int(capacity)
         self.buffer_seg1 = np.empty((self.capacity, size_segment, self.ds+self.da), dtype=np.float32)
-        self.buffer_seg2 = np.empty((self.capacity, size_segment, self.ds+self.da), dtype=np.float32)
+        self.buffer_seg2 = np.empty((self.capacity, size_segment, self.ds+self.da), dtype=np.float32) 
         self.buffer_label = np.empty((self.capacity, 1), dtype=np.float32)
         self.buffer_teacher = np.empty((self.capacity, 1), dtype=np.int8)
+        self.buffer_betas = None #TODO: for checking accuracy of beta model
         self.buffer_index = 0
         self.buffer_full = False
                 
@@ -128,9 +151,22 @@ class RewardModel:
         self.large_batch = large_batch
 
         self.teacher_selection = teacher_selection
-        
+        self.n_teachers = n_teachers
+        self.default_beta = default_beta
+        self.beta_activation = beta_activation
+        self.beta_lr = self.lr
+        self.beta_eps = beta_eps
+        self.beta_joint = beta_joint
+        self.beta_gaussian_used = beta_gaussian_used
+        self.beta_obs_mask = beta_obs_mask
+        self.construct_beta_model()
+
         self.label_margin = label_margin
         self.label_target = 1 - 2*self.label_margin
+    
+    @property
+    def beta_model_used(self):
+        return 'beta_model' in self.teacher_selection
     
     def softXEnt_loss(self, input, target):
         logprobs = torch.nn.functional.log_softmax (input, dim = 1)
@@ -151,7 +187,24 @@ class RewardModel:
             self.paramlst.extend(model.parameters())
             
         self.opt = torch.optim.Adam(self.paramlst, lr = self.lr)
-            
+    
+    def construct_beta_model(self):
+        in_size = self.beta_obs_mask.shape[0]*2 if self.beta_model_mask else self.ds*2
+        base_model = nn.Sequential(*gen_net(in_size=in_size, out_size=256, 
+                                        H=256, n_layers=2, activation='relu')).float().to(device)
+        if self.beta_gaussian_used:
+            self.beta_model = MultiHead(mode=base_model, in_dim=256, out_dim=self.)
+
+                                    
+            self.beta_model = MultiHead(model=base_model, in_dim=256, 
+                                        out_dim=#mean dims + width + scale, n_heads=n_teachers)
+        else:
+            self.beta_model = nn.Sequential(*gen_net(in_size=(self.ds+self.da)*2, 
+                                            out_size=self.n_teachers, H=256, n_layers=3, 
+                                            activation=self.beta_activation)).float().to(device)
+        #TODO: add dropout? add weight decay? add extra layer for n_teachers?
+        self.beta_opt = torch.optim.Adam(self.beta_model.parameters(), lr = self.beta_lr)
+
     def add_data(self, obs, act, rew, done, extra):
         sa_t = np.concatenate([obs, act], axis=-1)
         r_t = rew
@@ -259,6 +312,22 @@ class RewardModel:
         r_hats = np.array(r_hats)
 
         return np.mean(r_hats, axis=0)
+    
+    def beta_hat(self, x_1, x_2):
+        if self.beta_model_used:
+            x = np.concatenate((x_1, x_2), axis=-1)
+            assert x.shape[-1] == x_1.shape[-1] * 2
+            outs = self.beta_model(torch.from_numpy(x).float().to(device))
+            if self.beta_gaussian_used:
+                betas = 
+            assert betas.shape[-1] == self.n_teachers
+            return betas
+        else:
+            if len(x_1.shape) == 3:
+                shape = (x_1.shape[0], self.n_teachers)
+            else:
+                shape = (self.n_teachers)
+            return torch.ones(shape) * self.default_beta
     
     def save(self, model_dir, step):
         for member in range(self.de):
@@ -539,11 +608,13 @@ class RewardModel:
         for epoch in range(num_epochs):
             self.opt.zero_grad()
             loss = 0.0
-            
+            if not self.beta_joint:
+                beta_loss = 0.0
+
             last_index = (epoch+1)*self.train_batch_size
             if last_index > max_len:
                 last_index = max_len
-                
+
             for member in range(self.de):
                 
                 # get random batch
@@ -551,8 +622,9 @@ class RewardModel:
                 sa_t_1 = self.buffer_seg1[idxs]
                 sa_t_2 = self.buffer_seg2[idxs]
                 labels = self.buffer_label[idxs]
-                teachers = self.buffer_teacher[idxs]
+                teacher_ids = self.buffer_teacher[idxs]
                 labels = torch.from_numpy(labels.flatten()).long().to(device)
+                teacher_ids = torch.from_numpy(teacher_ids.flatten()).long().to(device)
                 
                 if member == 0:
                     total += labels.size(0)
@@ -563,43 +635,87 @@ class RewardModel:
                 r_hat1 = r_hat1.sum(axis=1)
                 r_hat2 = r_hat2.sum(axis=1)
                 r_hat = torch.cat([r_hat1, r_hat2], axis=-1)
+                
+                #apply 
+                if self.beta_model_used:
+                    beta_hat_all = self.beta_hat(sa_t_1, sa_t_2)
+                    beta_shape = (beta_hat_all.shape[0], beta_hat_all.shape[1])
+                    ones = torch.ones((beta_shape), dtype=torch.long).to(device)
+                    teacher_idx = (ones * teacher_ids.unsqueeze(1)).unsqueeze(2)
+                    beta_hat = torch.gather(beta_hat_all, axis=-1, index=teacher_idx)
+                    beta_hat = beta_hat.mean(axis=-2) 
 
-                # compute loss
-                curr_loss = self.CEloss(r_hat, labels)
+                if self.beta_joint:
+                    logits = r_hat * beta_hat
+                else:
+                    logits = r_hat
+                # compute reward loss
+                curr_loss = self.CEloss(logits, labels)
                 loss += curr_loss
                 ensemble_losses[member].append(curr_loss.item())
-                
+
+                # compute beta loss
+                if (not self.beta_joint) and self.beta_model_used:
+                    r_hat = r_hat.detach().clone()
+                    assert beta_hat.shape == torch.Size((r_hat.shape[0], 1))
+                    logits = r_hat * beta_hat
+                    curr_beta_loss = self.CEloss(logits, labels)
+                    beta_loss += curr_beta_loss
+
                 # compute acc
                 _, predicted = torch.max(r_hat.data, 1)
                 correct = (predicted == labels).sum().item()
                 ensemble_acc[member] += correct
-                
+
             loss.backward()
             self.opt.step()
+            if (not self.beta_joint) and self.beta_model_used:
+                beta_loss.backward()
+                self.beta_opt.step()
         
         ensemble_acc = ensemble_acc / total
         
         return ensemble_acc
     
-    def select_teachers(self, teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+    def select_teachers(self, teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, method=None):
+        method = self.teacher_selection if method is None else method
         batch_size = sa_t_1.shape[0]
+        if 'beta_model' in method:
+            beta_hats = np.empty((batch_size, self.n_teachers))
+        else:
+            beta_hats = None
         teacher_ids = np.empty((batch_size, 1), dtype=np.int8)
         for i in range(batch_size):
             sa_i_1 = sa_t_1[i]
             sa_i_2 = sa_t_2[i]
             info_i_1 = info_t_1[i]
             info_i_2 = info_t_2[i]
-            teacher_id = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2)
+            if 'beta_model' in method:
+                teacher_id, beta_hat = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2, method)
+                beta_hats[i] = beta_hat.cpu().numpy()
+            else:
+                teacher_id = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2, method)
             teacher_ids[i] = teacher_id
-        return teacher_ids
+        return teacher_ids, beta_hats
     
-    def select_teacher(self, teachers, sa_1, sa_2, info_1, info_2):
-        if self.teacher_selection == 'uniform':
+    def select_teacher(self, teachers, sa_1, sa_2, info_1, info_2, method):
+        if method == 'uniform':
             return self.uniform_selection(teachers, sa_1, sa_2, info_1, info_2)
-        elif self.teacher_selection == 'max_beta':
+        elif method == 'max_beta':
             return self.max_beta_selection(teachers, sa_1, sa_2, info_1, info_2)
+        elif method == 'beta_model_max_beta':
+            return self.beta_model_max_beta_selection(teachers, sa_1, sa_2)
+        elif method == 'beta_model_eps_greedy':
+            return self.beta_model_eps_greedy_selection(teachers, sa_1, sa_2)
         else: 
             raise NotImplementedError
+    
+    def max_beta_teachers(self, sa_t_1, sa_t_2, teachers):
+        batch_size = sa_t_1.shape[0]
+        teacher_ids = np.empty((batch_size, 1), dtype=np.int8)
+        for i in range(batch_size):
+            sa_1, sa_2 = sa_t_1[i], sa_t_2[i]
+            teacher_id = self.max_beta_selection(sa_1, sa_2, )
     
     def uniform_selection(self, teachers, sa_1, sa_2, info_1, info_2):
         return random.randrange(0, len(teachers))
@@ -612,9 +728,22 @@ class RewardModel:
             beta_sum = beta_1 + beta_2
             betas.append(beta_sum)
         return np.argmax(betas)
-
     
-    def train_soft_reward(self):
+    def beta_model_max_beta_selection(self, teachers, sa_1, sa_2):
+        with torch.no_grad():
+            betas = self.beta_hat(sa_1, sa_2)
+            beta_means = betas.mean(axis=0)
+            return torch.argmax(beta_means).detach().cpu().numpy(), beta_means
+
+    def beta_model_eps_greedy_selection(self, teachers, sa_1, sa_2):
+        max_teacher, beta_means = self.beta_model_max_beta_selection(teachers, sa_1, sa_2)
+        x = random.uniform(0,1)
+        if x < self.beta_eps:
+            return np.random.randint(0, self.n_teachers), beta_means
+        else:
+            return max_teacher, beta_means
+    
+    def train_soft_reward(self): #TODO:
         ensemble_losses = [[] for _ in range(self.de)]
         ensemble_acc = np.array([0 for _ in range(self.de)])
         
@@ -653,7 +782,11 @@ class RewardModel:
                 r_hat2 = self.r_hat_member(sa_t_2, member=member)
                 r_hat1 = r_hat1.sum(axis=1)
                 r_hat2 = r_hat2.sum(axis=1)
+                beta_hat = self.beta_hat(sa_t_1, sa_t_2)
                 r_hat = torch.cat([r_hat1, r_hat2], axis=-1)
+                assert r_hat.shape == beta_hat.shape
+                logits = r_hat * beta_hat
+
 
                 # compute loss
                 uniform_index = labels == -1
@@ -662,7 +795,7 @@ class RewardModel:
                 target_onehot += self.label_margin
                 if sum(uniform_index) > 0:
                     target_onehot[uniform_index] = 0.5
-                curr_loss = self.softXEnt_loss(r_hat, target_onehot)
+                curr_loss = self.softXEnt_loss(logits, target_onehot)
                 loss += curr_loss
                 ensemble_losses[member].append(curr_loss.item())
                 

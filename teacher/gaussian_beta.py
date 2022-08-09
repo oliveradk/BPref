@@ -72,6 +72,7 @@ class GaussianBetaTeachers(Teachers):
         self.beta_scale = beta_scale
         self.divide = divide
         self.strata_width = strata_width
+        self.obs_mask = None
         self.params = {
             'ds': ds, 
             'da': da, 
@@ -105,6 +106,7 @@ class GaussianBetaTeachers(Teachers):
     def define_teachers(self, obs_space, duplicates=False, log_dir=None):
         #preprocess environment space (remove duplicate and zero dimensions, normalize)
         box, obs_mask, norm_box = self._process_obs_space(obs_space, duplicates=duplicates)
+        self.obs_mask = obs_mask
         vol = utils.box_vol(norm_box)
         #partition envionment space into n strata (don't need actual enviornment, only observation_space)
         strata = stratify_generalized(

@@ -47,6 +47,9 @@ class Teachers():
         self.teachers = teachers
         self.sampling = sampling
     
+    def __len__(self):
+        return len(self.teachers)
+    
     def get_labels(self, teacher_ids, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
         # get teaches
         teachers = [self.teachers[int(i)] for i in teacher_ids]
