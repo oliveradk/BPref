@@ -272,7 +272,7 @@ def to_np(t):
         return t.cpu().detach().numpy()
 
 
-def log_episode(env, agent, writer, tag, log_video=True, log_info=True, log_obs=False, teachers=None):
+def log_episode(env, agent, writer, tag, meta, log_video=True, log_info=True, log_obs=False, teachers=None):
     done = False
     obs = env.reset()
     agent.reset()
@@ -281,7 +281,7 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True, log_obs=
     step=0
     while not done:
         if log_video:
-            frame = env.render(offscreen=True)
+            frame = env.render(offscreen=True) if meta else env.render(mode='rgb_array')
             frames.append(frame)
         with eval_mode(agent):
             action = agent.act(obs, sample=False)
@@ -295,10 +295,10 @@ def log_episode(env, agent, writer, tag, log_video=True, log_info=True, log_obs=
             for i, ob_val in enumerate(obs):
                 writer.add_scalar(f'obs/obs_{i}', ob_val, step)
         if teachers:
-            sa_t = np.concatenate((obs, action))[None, None,:]
+            sa_t = np.concatenate((obs, action))[None,:]
             info_t = [[info]]
             for i, teacher in enumerate(teachers.teachers):
-                beta = teacher.get_beta(sa_t, info_t)[0]
+                beta = teacher.get_beta(sa_t, info_t)
                 writer.add_scalar(f'{tag}/{type(teacher)}_{i}', beta, step)
     if log_video:
         frames = torch.from_numpy(np.array(frames))

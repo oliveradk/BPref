@@ -5,18 +5,19 @@ import hydra
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
 from teacher.grasp import GraspingTeachers
-from teacher.gaussian_beta import GaussianBetaTeachers
+from teacher.depricated.gaussian_beta import GaussianBetaTeachers
 from metaworld.envs.mujoco.sawyer_xyz.v2 import SawyerSweepEnvV2
 
 import utils
 from teacher.standard import StandardTeachers
 
-def log_agent(exp_path, log_dir, episodes, log_obs):
+def log_agent(exp_path, steps, log_dir, episodes, log_obs):
     cfg = OmegaConf.load(os.path.join(exp_path, '.hydra', 'config.yaml'))
     sw = SummaryWriter(os.path.join(exp_path, log_dir))
 
+    meta = 'metaworld' in cfg.env
     # make env
-    if 'metaworld' in cfg.env:
+    if meta:
         env = utils.make_metaworld_env(cfg)
     else:
         env = utils.make_env(cfg)
@@ -31,23 +32,33 @@ def log_agent(exp_path, log_dir, episodes, log_obs):
 
     #load agent
     agent = hydra.utils.instantiate(cfg.agent)
-    agent.load(model_dir=exp_path, step=1000000)
+    agent.load(model_dir=exp_path, step=steps)
 
     #load teachers
-    teachers = GaussianBetaTeachers(1, env.observation_space.shape[0], env.action_space.shape[0], 1, 0, 0, 0, 2, 800, 'uniform')
-    teachers.set_env(env)
+    cfg.teacher.params.ds = env.observation_space.shape[0]
+    cfg.teacher.params.da = env.action_space.shape[0]
+    teachers = hydra.utils.instantiate(cfg.teacher)
+    teachers.set_env(env, log_dir)
     
     for episode in range(episodes):
-        utils.log_episode(env, agent, sw, f'episode_{episode}', log_video=True,
-                          log_info=True, teachers=teachers, log_obs=log_obs)
+        utils.log_episode(env=env,
+                          agent=agent, 
+                          writer=sw, 
+                          tag=f'episode_{episode}',
+                          meta=meta, 
+                          log_video=True,
+                          log_info=False, 
+                          teachers=teachers, 
+                          log_obs=log_obs)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--exp_path', type=str, required=True)
+    parser.add_argument('--steps', type=int)
     parser.add_argument('--log_dir', type=str, default='episode_logs')
     parser.add_argument('--log_obs', default=False, action='store_true')
     parser.add_argument('--episodes', type=int, default=1)
     
     args = parser.parse_args()
 
-    log_agent(args.exp_path, args.log_dir, args.episodes, args.log_obs)
+    log_agent(args.exp_path, args.steps, args.log_dir, args.episodes, args.log_obs)
