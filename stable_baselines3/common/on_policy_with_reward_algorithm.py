@@ -200,7 +200,7 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             info_t_2)
 
         # get labels
-        sa_t_1, sa_t_2, r_t_1, r_t_2, labels, teacher_ids = \
+        sa_t_1, sa_t_2, r_t_1, r_t_2, labels, teacher_ids, betas = \
             self.teachers.get_labels(teacher_ids, *queries)
 
         #  put querries

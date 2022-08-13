@@ -607,10 +607,8 @@ class RewardModel:
     def max_beta_selection(self, teachers, sa_1, sa_2, info_1, info_2):
         betas = []
         for teacher in teachers:
-            beta_1 = teacher.get_beta(sa_1, info_1)
-            beta_2 = teacher.get_beta(sa_2, info_2)
-            beta_sum = beta_1 + beta_2
-            betas.append(beta_sum)
+            beta = teacher.get_beta(sa_1, sa_2, info_1, info_2)
+            betas.append(beta)
         return np.argmax(betas)
 
     
