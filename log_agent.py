@@ -4,12 +4,7 @@ import os
 import hydra
 from omegaconf import OmegaConf
 from torch.utils.tensorboard import SummaryWriter
-from teacher.grasp import GraspingTeachers
-from teacher.depricated.gaussian_beta import GaussianBetaTeachers
-from metaworld.envs.mujoco.sawyer_xyz.v2 import SawyerSweepEnvV2
-
 import utils
-from teacher.standard import StandardTeachers
 
 def log_agent(exp_path, steps, log_dir, episodes, log_obs):
     cfg = OmegaConf.load(os.path.join(exp_path, '.hydra', 'config.yaml'))

@@ -1,4 +1,5 @@
 import collections.abc
+import time
 
 import numpy as np
 import torch
@@ -276,7 +277,6 @@ def log_episode(env, agent, writer, tag, meta, log_video=True, log_info=True, lo
     done = False
     obs = env.reset()
     agent.reset()
-
     frames = []
     step=0
     while not done:
@@ -294,17 +294,21 @@ def log_episode(env, agent, writer, tag, meta, log_video=True, log_info=True, lo
         if log_obs:
             for i, ob_val in enumerate(obs):
                 writer.add_scalar(f'obs/obs_{i}', ob_val, step)
+        
         if teachers:
             sa_t = np.concatenate((obs, action))[None,:]
             info_t = [[info]]
             for i, teacher in enumerate(teachers.teachers):
-                beta = teacher.get_beta(sa_t, info_t)
+                beta = teacher.get_beta(sa_t, sa_t, info_t, info_t)
                 writer.add_scalar(f'{tag}/{type(teacher)}_{i}', beta, step)
+    #import ipdb; ipdb.set_trace()
     if log_video:
         frames = torch.from_numpy(np.array(frames))
         frames = frames.unsqueeze(0)
         frames = frames.permute(0, 1, 4, 2, 3)
         writer.add_video(f'{tag}/video', frames, step, fps=30)
+        time.sleep(5)
+
 
 
 def get_info_list(info, keys):
