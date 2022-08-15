@@ -24,9 +24,13 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv
     
 def make_env(cfg):
     """Helper function to create dm_control environment"""
+    split = cfg.env.split("_")
     if cfg.env == 'ball_in_cup_catch':
         domain_name = 'ball_in_cup'
         task_name = 'catch'
+    elif 'point_mass' in cfg.env:
+        domain_name = 'point_mass'
+        task_name = cfg.env.split("_")[-1]
     else:
         domain_name = cfg.env.split('_')[0]
         task_name = '_'.join(cfg.env.split('_')[1:])
