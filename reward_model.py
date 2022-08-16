@@ -87,7 +87,8 @@ class RewardModel:
     def __init__(self, ds, da, 
                  ensemble_size=3, lr=3e-4, mb_size = 128, size_segment=1, 
                  env_maker=None, max_size=100, activation='tanh', capacity=5e5,  
-                 large_batch=1, label_margin=0.0, teacher_selection='uniform'):
+                 large_batch=1, label_margin=0.0, teacher_selection='uniform', 
+                 state_mask=None):
         
         # train data is trajectories, must process to sa and s..   
         self.ds = ds
@@ -128,6 +129,7 @@ class RewardModel:
         self.large_batch = large_batch
 
         self.teacher_selection = teacher_selection
+        self.state_mask = state_mask
         
         self.label_margin = label_margin
         self.label_target = 1 - 2*self.label_margin
@@ -211,6 +213,13 @@ class RewardModel:
             probs.append(self.p_hat_entropy(x_1, x_2, member=member).cpu().numpy())
         probs = np.array(probs)
         return np.mean(probs, axis=0), np.std(probs, axis=0)
+    
+    def get_distance(self, x_1, x_2):
+        if self.state_mask is not None:
+            x_1 = x_1[:, :, self.state_mask]
+            x_2 = x_2[:, :, self.state_mask]
+        dist = np.linalg.norm(x_1 - x_2, axis=2)
+        return np.mean(dist, axis=1)
 
     def p_hat_member(self, x_1, x_2, member=-1):
         # softmaxing to get the probabilities according to eqn 1
@@ -509,7 +518,7 @@ class RewardModel:
     def entropy_sampling(self):
         
         # get queries
-        sa_t_1, sa_t_2, r_t_1, r_t_2 =  self.get_queries(
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_1, info_2 =  self.get_queries(
             mb_size=self.mb_size*self.large_batch)
         
         # get final queries based on uncertainty
@@ -523,6 +532,21 @@ class RewardModel:
         
         return sa_t_1, sa_t_2, r_t_1, r_t_2
     
+    def similarity_sampling(self):
+        # get queries
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = self.get_queries(
+            mb_size=self.mb_size*self.large_batch)
+        
+        dist = self.get_distance(sa_t_1, sa_t_2)
+        top_k_index = (dist).argsort()[:self.mb_size]
+        r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
+        r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
+        info_t_1 = [info_t_1[i] for i in top_k_index]
+        info_t_2 = [info_t_2[i] for i in top_k_index]        
+        
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
+
+
     def train_reward(self):
         ensemble_losses = [[] for _ in range(self.de)]
         ensemble_acc = np.array([0 for _ in range(self.de)])

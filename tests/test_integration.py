@@ -12,8 +12,8 @@ def run_script(script):
     return subprocess.call(path)
 
 
-def test_pebble_cartpole_gaussian():
-    exit_code = run_script("run_PEBBLE_cartpole_gaussian.sh")
+def test_pebble_cartpole_gaussian_sim_querries():
+    exit_code = run_script("run_PEBBLE_cartpole_gaussian_sim_querries.sh")
     assert exit_code == 0
 
 

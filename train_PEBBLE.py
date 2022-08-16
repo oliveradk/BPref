@@ -80,6 +80,7 @@ class Workspace(object):
             large_batch=cfg.large_batch,
             label_margin=cfg.label_margin,
             teacher_selection=cfg.teacher_selection,
+            state_mask=cfg.state_mask,
         )
 
         # instantiate the teaches
@@ -173,6 +174,8 @@ class Workspace(object):
                 queries = self.reward_model.kcenter_disagree_sampling()
             elif self.cfg.feed_type == 5:
                 queries = self.reward_model.kcenter_entropy_sampling()
+            elif self.cfg.feed_type == 6: 
+                queries = self.reward_model.similarity_sampling()
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries

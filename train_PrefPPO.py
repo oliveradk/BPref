@@ -62,9 +62,10 @@ if __name__ == "__main__":
     parser.add_argument("--re-batch", help="Batch size", type=int, default=128)
     parser.add_argument("--re-update", help="Gradient update of reward fn", type=int, default=100)
     parser.add_argument("--re-feed-type", help="type of feedback", type=int, default=0)
-    parser.add_argument("--re_teacher-select", help="teacher selection method", type=str, default='uniform')
+    parser.add_argument("--re-teacher-select", help="teacher selection method", type=str, default='uniform')
     parser.add_argument("--re-large-batch", help="size of buffer for ensemble uncertainty", type=int, default=10)
     parser.add_argument("--re-max-feed", help="# of total feedback", type=int, default=1400)
+    parser.add_argument("--re-state-mask", help="indicies involved in teacher beta func", type=int, nargs='+', default=None)
     parser.add_argument("--teachers", type=str, default='standard')
     args = parser.parse_args()
     
@@ -146,7 +147,8 @@ if __name__ == "__main__":
         lr=args.re_lr,
         mb_size=args.re_batch,
         large_batch=args.re_large_batch,
-        teacher_selection=args.re_teacher_select)
+        teacher_selection=args.re_teacher_select,
+        state_mask=args.re_state_mask)
     
     if args.normalize == 1:
         env = VecNormalize(env, norm_reward=False)

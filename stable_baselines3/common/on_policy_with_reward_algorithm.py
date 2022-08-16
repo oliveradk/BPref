@@ -190,6 +190,8 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
                 queries = self.reward_model.disagreement_sampling()
             elif self.feed_type == 2:
                 queries = self.reward_model.entropy_sampling()
+            elif self.feed_type == 6:
+                queries = self.reward_model.similarity_sampling()
             else:
                 raise NotImplementedError
         
