@@ -1,0 +1,1 @@
+python train_PEBBLE.py hydra.exp_name=point_mass_trials env=point_mass_easy seed=12345 agent.params.actor_lr=0.0001 agent.params.critic_lr=0.0001 gradient_update=1 activation=tanh num_unsup_steps=50000 num_train_steps=250000 num_interact=5000 max_feedback=2000 reward_batch=50 reward_update=50 feed_type=1
