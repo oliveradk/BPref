@@ -16,10 +16,15 @@ def test_pebble_cartpole_gaussian_sim_querries():
     exit_code = run_script("run_PEBBLE_cartpole_gaussian_sim_querries.sh")
     assert exit_code == 0
 
+def test_pebble_acrobot_gaussian_log_queries():
+    exit_code = run_script("run_PEBBLE_acrobot_gaussian_log_queries.sh")
+    assert exit_code == 0
+
 
 def test_pebble_acrobot_gaussian():
     exit_code = run_script("run_PEBBLE_acrobot_gaussian.sh")
     assert exit_code == 0
+
 
 
 def test_pebble_sweep_into_grasp_inplace_gaussian():

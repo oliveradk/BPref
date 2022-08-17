@@ -30,6 +30,7 @@ class Workspace(object):
         self.logger = Logger(
             self.work_dir,
             save_tb=cfg.log_save_tb,
+            log_queries=cfg.ground_truth,
             log_frequency=cfg.log_frequency,
             agent=cfg.agent.name,
         )
@@ -66,7 +67,11 @@ class Workspace(object):
         self.total_feedback = 0
         self.labeled_feedback = 0
         self.betas = np.empty(cfg.reward_batch)
+        self.r_diffs = np.empty(cfg.reward_batch)
         self.step = 0
+
+        # train using ground truth reward (used for collecting trajectories)
+        self.ground_truth = cfg.ground_truth
 
         # instantiating the reward model
         self.reward_model = RewardModel(
@@ -179,6 +184,10 @@ class Workspace(object):
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
+        if self.ground_truth:
+            self.logger.save_query(
+                sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, self.step
+            )
 
         teacher_ids = self.reward_model.select_teachers(
             self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
@@ -193,7 +202,10 @@ class Workspace(object):
             teacher_ids,
             betas,
         ) = self.teachers.get_labels(teacher_ids, *queries)
-
+        with torch.no_grad():
+            r_hat_1 = self.reward_model.r_hat_batch(sa_t_1).sum(axis=1)
+            r_hat_2 = self.reward_model.r_hat_batch(sa_t_2).sum(axis=1)
+        
         #  put querries
         if len(labels) > 0:
             self.reward_model.put_queries(sa_t_1, sa_t_2, labels, teacher_ids)
@@ -201,8 +213,10 @@ class Workspace(object):
         self.total_feedback += self.reward_model.mb_size
         self.labeled_feedback += len(labels)
         self.betas = betas
+        self.r_diffs = np.abs(r_hat_1 - r_hat_2)
 
         train_acc = 0
+        total_acc = 0
         if self.labeled_feedback > 0:
             # update reward
             for epoch in range(self.cfg.reward_update):
@@ -263,6 +277,10 @@ class Workspace(object):
                 self.logger.log("train/beta_median", np.median(self.betas), self.step)
                 self.logger.log("train/beta_min", np.min(self.betas), self.step)
                 self.logger.log("train/beta_max", np.max(self.betas), self.step)
+                
+                self.logger.log("train/r_diff_mean", np.mean(self.r_diffs), self.step)
+                self.logger.log("train/r_diff_max", np.max(self.r_diffs), self.step)
+                self.logger.log("train/r_diff_min", np.min(self.r_diffs), self.step)
 
                 if self.log_success:
                     self.logger.log("train/episode_success", episode_success, self.step)
@@ -324,7 +342,8 @@ class Workspace(object):
                 self.learn_reward(first_flag=1)
 
                 # relabel buffer
-                self.replay_buffer.relabel_with_predictor(self.reward_model)
+                if not self.ground_truth:
+                    self.replay_buffer.relabel_with_predictor(self.reward_model)
 
                 # reset Q due to unsuperivsed exploration
                 self.agent.reset_critic()
@@ -376,7 +395,8 @@ class Workspace(object):
                             )
 
                         self.learn_reward()
-                        self.replay_buffer.relabel_with_predictor(self.reward_model)
+                        if not self.ground_truth:
+                            self.replay_buffer.relabel_with_predictor(self.reward_model)
                         interact_count = 0
 
                 self.agent.update(self.replay_buffer, self.logger, self.step, 1)
@@ -409,7 +429,10 @@ class Workspace(object):
 
             # adding data to the reward training data
             self.reward_model.add_data(obs, action, reward, done, extra)
-            self.replay_buffer.add(obs, action, reward_hat, next_obs, done, done_no_max)
+            if self.ground_truth:
+                self.replay_buffer.add(obs, action, reward, next_obs, done, done_no_max)
+            else:
+                self.replay_buffer.add(obs, action, reward_hat, next_obs, done, done_no_max)
 
             obs = next_obs
             episode_step += 1

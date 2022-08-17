@@ -1,6 +1,7 @@
 from torch.utils.tensorboard import SummaryWriter
 from collections import defaultdict
 import json
+import pickle as pkl
 import os
 import csv
 import shutil
@@ -129,6 +130,7 @@ class Logger(object):
     def __init__(self,
                  log_dir,
                  save_tb=False,
+                 log_queries=False,
                  log_frequency=10000,
                  agent='sac'):
         self._log_dir = log_dir
@@ -144,6 +146,11 @@ class Logger(object):
             self._sw = SummaryWriter(tb_dir)
         else:
             self._sw = None
+        if log_queries:
+            self.query_dir = os.path.join(log_dir, 'queries')
+            if os.path.exists(self.query_dir):
+                shutil.rmtree(self.query_dir)
+            os.mkdir(self.query_dir)
         # each agent has specific output format for training
         assert agent in AGENT_TRAIN_FORMAT
         train_format = COMMON_TRAIN_FORMAT + AGENT_TRAIN_FORMAT[agent]
@@ -151,6 +158,7 @@ class Logger(object):
                                      formating=train_format)
         self._eval_mg = MetersGroup(os.path.join(log_dir, 'eval'),
                                     formating=COMMON_EVAL_FORMAT)
+        
 
     def _should_log(self, step, log_frequency):
         log_frequency = log_frequency or self._log_frequency
@@ -213,3 +221,14 @@ class Logger(object):
             self._train_mg.dump(step, 'train', save)
         else:
             raise f'invalid log type: {ty}'
+    
+    def save_query(self, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, step):
+        dir_path = os.path.join(self.query_dir, str(step))
+        os.mkdir(dir_path)
+        
+        pkl.dump(sa_t_1, open(os.path.join(dir_path, "sa_t_1.pkl"), 'wb'))
+        pkl.dump(sa_t_2, open(os.path.join(dir_path, "sa_t_2.pkl"), 'wb'))
+        pkl.dump(r_t_1, open(os.path.join(dir_path, "r_t_1.pkl"), 'wb'))
+        pkl.dump(r_t_2, open(os.path.join(dir_path, "r_t_2.pkl"), 'wb'))
+        pkl.dump(info_t_1, open(os.path.join(dir_path, "info_t_1.pkl"), 'wb'))
+        pkl.dump(info_t_2, open(os.path.join(dir_path, "info_t_2.pkl"), 'wb'))

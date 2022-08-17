@@ -23,6 +23,7 @@ large_batch: 10
 label_margin: 0.0
 teacher_selection: uniform
 state_mask: None
+ground_truth: False
 
 # scheduling
 reward_schedule: 0
