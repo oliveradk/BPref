@@ -699,3 +699,139 @@ class RewardModel:
         ensemble_acc = ensemble_acc / total
         
         return ensemble_acc
+    
+    def train_reward_beta_model(self, beta_model, beta_optim):
+        ensemble_losses = [[] for _ in range(self.de)]
+        ensemble_acc = np.array([0 for _ in range(self.de)])
+        
+        max_len = self.capacity if self.buffer_full else self.buffer_index
+        total_batch_index = []
+        for _ in range(self.de):
+            total_batch_index.append(np.random.permutation(max_len))
+        
+        num_epochs = int(np.ceil(max_len/self.train_batch_size))
+        list_debug_loss1, list_debug_loss2 = [], []
+        total = 0
+        
+        for epoch in range(num_epochs):
+            self.opt.zero_grad()
+            loss = 0.0
+            
+            last_index = (epoch+1)*self.train_batch_size
+            if last_index > max_len:
+                last_index = max_len
+                
+            for member in range(self.de):
+                
+                # get random batch
+                idxs = total_batch_index[member][epoch*self.train_batch_size:last_index]
+                sa_t_1 = self.buffer_seg1[idxs]
+                sa_t_2 = self.buffer_seg2[idxs]
+                labels = self.buffer_label[idxs]
+                teachers = self.buffer_teacher[idxs]
+                labels = torch.from_numpy(labels.flatten()).long().to(device)
+                
+                if member == 0:
+                    total += labels.size(0)
+                
+                # get logits
+                r_hat1 = self.r_hat_member(sa_t_1, member=member)
+                r_hat2 = self.r_hat_member(sa_t_2, member=member)
+                r_hat1 = r_hat1.sum(axis=1)
+                r_hat2 = r_hat2.sum(axis=1)
+                r_hat = torch.cat([r_hat1, r_hat2], axis=-1)
+
+                beta_hat = beta_model.beta_hat(sa_t_1, sa_t_2)
+                beta_hat = beta_hat.sum(axis=1)[:, None]
+
+                assert beta_hat.shape == torch.Size((r_hat.shape[0], 1))
+                logits = beta_hat * r_hat
+                assert logits.shape == r_hat.shape
+                with torch.no_grad():
+                    assert logits[0][1] == r_hat[0][1] * beta_hat[0]
+                # compute loss
+                curr_loss = self.CEloss(logits, labels)
+                loss += curr_loss
+                ensemble_losses[member].append(curr_loss.item())
+                
+                # compute acc
+                _, predicted = torch.max(r_hat.data, 1)
+                correct = (predicted == labels).sum().item()
+                ensemble_acc[member] += correct
+                
+            loss.backward()
+            self.opt.step()
+            beta_optim.step()
+        
+        ensemble_acc = ensemble_acc / total
+        
+        return ensemble_acc
+
+    def train_reward_beta_models(self, beta_models, beta_optims):
+        ensemble_losses = [[] for _ in range(self.de)]
+        ensemble_acc = np.array([0 for _ in range(self.de)])
+        
+        max_len = self.capacity if self.buffer_full else self.buffer_index
+        total_batch_index = []
+        for _ in range(self.de):
+            total_batch_index.append(np.random.permutation(max_len))
+        
+        num_epochs = int(np.ceil(max_len/self.train_batch_size))
+        total = 0
+        
+        for epoch in range(num_epochs):
+            self.opt.zero_grad()
+            loss = 0.0
+            
+            last_index = (epoch+1)*self.train_batch_size
+            if last_index > max_len:
+                last_index = max_len
+                
+            for member in range(self.de):
+                
+                # get random batch
+                idxs = total_batch_index[member][epoch*self.train_batch_size:last_index]
+                sa_t_1 = self.buffer_seg1[idxs]
+                sa_t_2 = self.buffer_seg2[idxs]
+                labels = self.buffer_label[idxs]
+                teachers = self.buffer_teacher[idxs]
+                labels = torch.from_numpy(labels.flatten()).long().to(device)
+                
+                if member == 0:
+                    total += labels.size(0)
+                
+                # get logits
+                r_hat1 = self.r_hat_member(sa_t_1, member=member)
+                r_hat2 = self.r_hat_member(sa_t_2, member=member)
+                r_hat1 = r_hat1.sum(axis=1)
+                r_hat2 = r_hat2.sum(axis=1)
+                r_hat = torch.cat([r_hat1, r_hat2], axis=-1)
+                beta_hat = torch.stack(
+                    [beta_models[int(t_id)].beta_hat(sa_t_1[i], sa_t_2[i]) 
+                    for i, t_id in enumerate(teachers)]
+                )
+                beta_hat = beta_hat.sum(axis=1)[:, None]
+
+                assert beta_hat.shape == torch.Size((r_hat.shape[0], 1))
+                logits = beta_hat * r_hat
+                assert logits.shape == r_hat.shape
+                with torch.no_grad():
+                    assert logits[0][1] == r_hat[0][1] * beta_hat[0]
+                # compute loss
+                curr_loss = self.CEloss(logits, labels)
+                loss += curr_loss
+                ensemble_losses[member].append(curr_loss.item())
+                
+                # compute acc
+                _, predicted = torch.max(r_hat.data, 1)
+                correct = (predicted == labels).sum().item()
+                ensemble_acc[member] += correct
+                
+            loss.backward()
+            self.opt.step()
+            for beta_optim in beta_optims:
+                beta_optim.step()
+        
+        ensemble_acc = ensemble_acc / total
+        
+        return ensemble_acc
