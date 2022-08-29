@@ -84,17 +84,34 @@ def compute_smallest_dist(obs, full_obs):
     return total_dists.unsqueeze(1)
 
 class RewardModel:
-    def __init__(self, ds, da, 
-                 ensemble_size=3, lr=3e-4, mb_size = 128, size_segment=1, 
-                 env_maker=None, max_size=100, activation='tanh', capacity=5e5,  
-                 large_batch=1, label_margin=0.0, teacher_selection='uniform', 
-                 state_mask=None):
+    def __init__(self, 
+        ds, 
+        da, 
+        n_teachers,
+        ensemble_size=3, 
+        lr=3e-4, 
+        mb_size=128, 
+        weight_decay=0,
+        size_segment=1, 
+        env_maker=None, 
+        max_size=100, 
+        activation='tanh', 
+        capacity=5e5,  
+        large_batch=1, 
+        label_margin=0.0, 
+        teacher_selection='uniform', 
+        state_mask=None, 
+        dist='mean', 
+        topk=-1
+    ):
         
         # train data is trajectories, must process to sa and s..   
         self.ds = ds
         self.da = da
+        self.n_teachers = n_teachers
         self.de = ensemble_size
         self.lr = lr
+        self.weight_decay = weight_decay
         self.ensemble = []
         self.paramlst = []
         self.opt = None
@@ -129,7 +146,9 @@ class RewardModel:
         self.large_batch = large_batch
 
         self.teacher_selection = teacher_selection
-        self.state_mask = state_mask
+        self.state_mask = state_mask if state_mask is not None else list(range(self.ds))
+        self.dist = dist
+        self.topk = topk
         
         self.label_margin = label_margin
         self.label_target = 1 - 2*self.label_margin
@@ -151,8 +170,8 @@ class RewardModel:
                                            activation=self.activation)).float().to(device)
             self.ensemble.append(model)
             self.paramlst.extend(model.parameters())
-            
-        self.opt = torch.optim.Adam(self.paramlst, lr = self.lr)
+
+        self.opt = torch.optim.Adam(self.paramlst, lr = self.lr, weight_decay = self.weight_decay)
             
     def add_data(self, obs, act, rew, done, extra):
         sa_t = np.concatenate([obs, act], axis=-1)
@@ -218,8 +237,18 @@ class RewardModel:
         if self.state_mask is not None:
             x_1 = x_1[:, :, self.state_mask]
             x_2 = x_2[:, :, self.state_mask]
-        dist = np.linalg.norm(x_1 - x_2, axis=2)
-        return np.mean(dist, axis=1)
+        
+        if self.dist == "mean":
+            x_1_mean = np.mean(x_1, axis=1)
+            x_2_mean = np.mean(x_2, axis=1)
+            dist = np.linalg.norm(x_1_mean - x_2_mean, axis=1)
+        elif self.dist == "element_wise":
+            dist = np.linalg.norm(x_1 - x_2, axis=2).mean(axis=1)
+        else:
+            raise ValueError(f"{self.dist} invalid distance method")
+
+        return dist
+
 
     def p_hat_member(self, x_1, x_2, member=-1):
         # softmaxing to get the probabilities according to eqn 1
@@ -546,6 +575,27 @@ class RewardModel:
         
         return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
 
+    def similarity_disagreement_sampling(self):
+        # get queries
+        sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = self.get_queries(
+            mb_size=self.mb_size*self.large_batch)
+        dist = self.get_distance(sa_t_1, sa_t_2)
+        norm_dist = dist / np.sum(dist)
+
+        _, disagree = self.get_rank_probability(sa_t_1, sa_t_2)
+        norm_disagree = disagree / np.sum(disagree)
+
+        hybrid_score = norm_disagree - norm_dist
+
+        top_k_index = (-hybrid_score).argsort()[:self.mb_size]
+        r_t_1, sa_t_1 = r_t_1[top_k_index], sa_t_1[top_k_index]
+        r_t_2, sa_t_2 = r_t_2[top_k_index], sa_t_2[top_k_index]
+        info_t_1 = [info_t_1[i] for i in top_k_index]
+        info_t_2 = [info_t_2[i] for i in top_k_index]        
+        
+        return sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
+
+
 
     def train_reward(self):
         ensemble_losses = [[] for _ in range(self.de)]
@@ -608,32 +658,125 @@ class RewardModel:
     def select_teachers(self, teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
         batch_size = sa_t_1.shape[0]
         teacher_ids = np.empty((batch_size, 1), dtype=np.int8)
+        infos = []
         for i in range(batch_size):
             sa_i_1 = sa_t_1[i]
             sa_i_2 = sa_t_2[i]
             info_i_1 = info_t_1[i]
             info_i_2 = info_t_2[i]
-            teacher_id = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2)
+            teacher_id, info = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2)
             teacher_ids[i] = teacher_id
-        return teacher_ids
+            infos.append(info)
+        return teacher_ids, infos
     
     def select_teacher(self, teachers, sa_1, sa_2, info_1, info_2):
         if self.teacher_selection == 'uniform':
             return self.uniform_selection(teachers, sa_1, sa_2, info_1, info_2)
         elif self.teacher_selection == 'max_beta':
             return self.max_beta_selection(teachers, sa_1, sa_2, info_1, info_2)
+        elif self.teacher_selection == 'prox_const':
+            return self.proximity_consistency_selection(teachers, sa_1, sa_2, info_1, info_2)
         else: 
             raise NotImplementedError
     
     def uniform_selection(self, teachers, sa_1, sa_2, info_1, info_2):
-        return random.randrange(0, len(teachers))
+        return random.randrange(0, len(teachers)), {}
     
     def max_beta_selection(self, teachers, sa_1, sa_2, info_1, info_2):
         betas = []
         for teacher in teachers:
             beta = teacher.get_beta(sa_1, sa_2, info_1, info_2)
             betas.append(beta)
-        return np.argmax(betas)
+        return np.argmax(betas), {}
+    
+
+    def proximity_consistency_selection(self, teachers, sa_1, sa_2, info_1, info_2):
+        # compute distance from average value on dimension(s) of variation for sa_1, sa_2 for all queries in buffer
+        mean_1 = sa_1[:, self.state_mask].mean(axis=0)
+        mean_2 = sa_2[:, self.state_mask].mean(axis=0)
+        assert mean_1.shape == (len(self.state_mask),)
+
+        mean_seg_1 = self.buffer_seg1[:self.buffer_index, :, self.state_mask].mean(axis=1)
+        mean_seg_2 = self.buffer_seg2[:self.buffer_index, :, self.state_mask].mean(axis=1)
+        assert mean_seg_1.shape == (self.buffer_index, len(self.state_mask))
+        
+        dist_1 = np.linalg.norm(
+            np.concatenate([mean_seg_1, mean_seg_2], axis=1) - np.concatenate([mean_1, mean_2]), 
+            axis=1,
+        )
+        dist_2 = np.linalg.norm(
+            np.concatenate([mean_seg_1, mean_seg_2], axis=1) - np.concatenate([mean_2, mean_1]),
+            axis=1,
+        )
+        assert dist_1.shape == (self.buffer_index,)
+
+        dist = np.min(np.stack([dist_1, dist_2], axis=1), axis=1)
+        assert dist.shape == (self.buffer_index,)
+        # if self.buffer_index > 0:
+        #     import ipdb; ipdb.set_trace()
+        # get topk (where k is hyperparameter)
+        topk_query_idxs = np.argsort(dist)[:min(self.topk, self.buffer_index)]
+        
+        # label queries using current reward model
+        with torch.no_grad():
+            r_t_1 = self.r_hat_batch(self.buffer_seg1[topk_query_idxs])
+            r_t_2 = self.r_hat_batch(self.buffer_seg2[topk_query_idxs])
+        sum_r_t_1 = r_t_1.sum(axis=1)
+        sum_r_t_2 = r_t_2.sum(axis=1)
+        cur_labels = np.argmax(np.hstack([sum_r_t_1, sum_r_t_2]), axis=1)[:, None]
+        changed = []
+        for teacher_id in range(self.n_teachers):
+            teach_query_idxs = self.buffer_teacher[topk_query_idxs] == teacher_id
+            teach_changed = np.sum(
+                cur_labels[teach_query_idxs] != self.buffer_label[topk_query_idxs][teach_query_idxs]
+            )
+            changed.append(teach_changed)
+        
+        const_teacher = np.argmin(changed)
+        
+        max_beta_teacher, _info = self.max_beta_selection(teachers, sa_1, sa_2, info_1, info_2)
+        is_max_beta = const_teacher == max_beta_teacher
+        
+        return const_teacher, {'is_max_beta': is_max_beta}
+    
+    # def k_nearest_selection(self, teachers, sa_1, sa_2, info_1, info_2, k=50):
+    #     #TODO: rename to region regret
+    #     #get top k closest queries according to relevant dimension
+
+    #     #for each query 
+    #         #get current r_hat value
+    #     #fore each teacher
+    #         #count number of labels now regarded as mistakes by reward model (maybe log this)
+            
+    #     #NOTE: possible problems: no memory (I think buffer is big enough though)
+    #     #NOTE: could try ignoring queries from first training 
+        
+    #     #find nearest according to relevant dimension
+
+    #     #
+    #     pass
+    #     # temp_sa_1 = sa_1[:, :self.ds]
+    #     # temp_sa_2 = sa_2[:, :self.ds]
+
+    #     # temp_sa = np.concatenate([temp_sa_1.flatten()[None,],
+    #     #                          temp_sa_2.flatten()[None,]], axis=1)
+
+    #     # max_len = self.capacity if self.buffer_full else self.buffer_index
+
+    #     # tot_sa_1 = self.buffer_seg1[:max_len, :, :self.ds]
+    #     # tot_sa_2 = self.buffer_seg2[:max_len, :, :self.ds]
+    #     # labels = self.buffer_label[:max_len]
+    #     # teachers = self.buffer_teacher[:max_len]
+    #     # tot_sa = np.concatenate([tot_sa_1.reshape(max_len, -1),
+    #     #                          tot_sa_2.reshape(max_len, -1)])
+        
+    #     # #for each teacher
+    #     #     # filter for trajectories labeled by teacher
+    #     #     # get top k closest queries (deal with symmetry)
+    #     # for teacher in teachers:
+    #     #     dists = np.linalg.norm() #TODO 
+        
+        
 
     
     def train_soft_reward(self):
@@ -835,3 +978,25 @@ class RewardModel:
         ensemble_acc = ensemble_acc / total
         
         return ensemble_acc
+    
+    def frac_changed_labels(self):
+        with torch.no_grad():
+            r_t_1 = self.r_hat_batch(self.buffer_seg1[:self.buffer_index])
+            r_t_2 = self.r_hat_batch(self.buffer_seg2[:self.buffer_index])
+        sum_r_t_1 = r_t_1.sum(axis=1)
+        sum_r_t_2 = r_t_2.sum(axis=1)
+        cur_labels = np.argmax(np.hstack([sum_r_t_1, sum_r_t_2]), axis=1)[:, None]
+        assert cur_labels.shape == torch.Size((r_t_1.shape[0], 1))
+
+        old_labels = self.buffer_label[:self.buffer_index]
+        assert old_labels.shape == cur_labels.shape
+
+        frac_changed = []
+        for teacher_id in range(self.n_teachers):
+            teacher_mask = self.buffer_teacher[:self.buffer_index] == teacher_id
+            frac = np.mean(cur_labels[teacher_mask] != old_labels[teacher_mask])
+            if np.isnan(frac):
+                frac = 0
+            frac_changed.append(frac) 
+        
+        return frac_changed

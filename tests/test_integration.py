@@ -21,8 +21,8 @@ def test_pebble_acrobot_gaussian_log_queries():
     assert exit_code == 0
 
 
-def test_pebble_acrobot_gaussian():
-    exit_code = run_script("run_PEBBLE_acrobot_gaussian.sh")
+def test_pebble_acrobot_gaussian_sim_dis_queries():
+    exit_code = run_script("run_PEBBLE_acrobot_gaussian_sim_dis_queries.sh")
     assert exit_code == 0
 
 

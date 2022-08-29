@@ -68,31 +68,39 @@ class Workspace(object):
         self.labeled_feedback = 0
         self.betas = np.empty(cfg.reward_batch)
         self.r_diffs = np.empty(cfg.reward_batch)
+        self.teacher_info = []
         self.step = 0
 
         # train using ground truth reward (used for collecting trajectories)
         self.ground_truth = cfg.ground_truth
-
-        # instantiating the reward model
-        self.reward_model = RewardModel(
-            self.env.observation_space.shape[0],
-            self.env.action_space.shape[0],
-            ensemble_size=cfg.ensemble_size,
-            size_segment=cfg.segment,
-            activation=cfg.activation,
-            lr=cfg.reward_lr,
-            mb_size=cfg.reward_batch,
-            large_batch=cfg.large_batch,
-            label_margin=cfg.label_margin,
-            teacher_selection=cfg.teacher_selection,
-            state_mask=cfg.state_mask,
-        )
 
         # instantiate the teaches
         cfg.teacher.params.ds = self.env.observation_space.shape[0]
         cfg.teacher.params.da = self.env.action_space.shape[0]
         self.teachers = hydra.utils.instantiate(cfg.teacher)
         self.teachers.set_env(self.env, self.logger._log_dir)
+        
+        self.frac_changed = [0] * len(self.teachers.teachers)
+        
+        # instantiating the reward model
+        self.reward_model = RewardModel(
+            self.env.observation_space.shape[0],
+            self.env.action_space.shape[0],
+            n_teachers=len(self.teachers.teachers),
+            ensemble_size=cfg.ensemble_size,
+            size_segment=cfg.segment,
+            activation=cfg.activation,
+            lr=cfg.reward_lr,
+            weight_decay=cfg.reward_weight_decay,
+            mb_size=cfg.reward_batch,
+            large_batch=cfg.large_batch,
+            label_margin=cfg.label_margin,
+            teacher_selection=cfg.teacher_selection,
+            state_mask=cfg.state_mask if cfg.state_mask != "None" else None,
+            dist=cfg.dist,
+            topk=cfg.topk,
+        )
+
 
     def evaluate(self):
         average_episode_reward = 0
@@ -181,6 +189,8 @@ class Workspace(object):
                 queries = self.reward_model.kcenter_entropy_sampling()
             elif self.cfg.feed_type == 6: 
                 queries = self.reward_model.similarity_sampling()
+            elif self.cfg.feed_type == 7:
+                queries = self.reward_model.similarity_disagreement_sampling()
             else:
                 raise NotImplementedError
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
@@ -189,7 +199,7 @@ class Workspace(object):
                 sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, self.step
             )
 
-        teacher_ids = self.reward_model.select_teachers(
+        teacher_ids, teacher_info = self.reward_model.select_teachers(
             self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
         )
 
@@ -209,10 +219,11 @@ class Workspace(object):
         #  put querries
         if len(labels) > 0:
             self.reward_model.put_queries(sa_t_1, sa_t_2, labels, teacher_ids)
-
+            self.frac_changed = self.reward_model.frac_changed_labels()
         self.total_feedback += self.reward_model.mb_size
         self.labeled_feedback += len(labels)
         self.betas = betas
+        self.teacher_info = teacher_info
         self.r_diffs = np.abs(r_hat_1 - r_hat_2)
 
         train_acc = 0
@@ -281,6 +292,18 @@ class Workspace(object):
                 self.logger.log("train/r_diff_mean", np.mean(self.r_diffs), self.step)
                 self.logger.log("train/r_diff_max", np.max(self.r_diffs), self.step)
                 self.logger.log("train/r_diff_min", np.min(self.r_diffs), self.step)
+
+                if self.reward_model.teacher_selection == 'prox_const':
+                    if len(self.teacher_info) == 0:
+                        max_beta_acc = 0
+                    else:
+                        max_beta_acc = np.array(
+                        [info['is_max_beta'] for info in self.teacher_info]
+                        ).mean()
+                    self.logger.log("train/max_beta_acc", max_beta_acc, self.step)
+
+                for i, frac_changed_i in enumerate(self.frac_changed):
+                    self.logger.log(f"train/frac_changed_{i}", frac_changed_i, self.step)
 
                 if self.log_success:
                     self.logger.log("train/episode_success", episode_success, self.step)

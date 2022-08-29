@@ -66,6 +66,9 @@ if __name__ == "__main__":
     parser.add_argument("--re-large-batch", help="size of buffer for ensemble uncertainty", type=int, default=10)
     parser.add_argument("--re-max-feed", help="# of total feedback", type=int, default=1400)
     parser.add_argument("--re-state-mask", help="indicies involved in teacher beta func", type=int, nargs='+', default=None)
+    parser.add_argument("--re-weight-decay", type=float, default=0)
+    parser.add_argument("--re-dist", help="aggregation used in reward model distance function", type=str, default='mean')
+    parser.add_argument("--re-topk", help="number of queries initially sampled by teacher selection methods", type=int, default=250)
     parser.add_argument("--teachers", type=str, default='standard')
     args = parser.parse_args()
     
@@ -86,7 +89,8 @@ if __name__ == "__main__":
     else:
         args.tensorboard_log += env_name
 
-    args.tensorboard_log += '/teacher_' + str(teacher_cfg.teacher.params.beta)
+    args.tensorboard_log += '/teacher_' + str(args.teachers)
+    args.tensorboard_log +=  str(teacher_cfg.teacher.params.beta)
     args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.gamma)
     args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.eps_mistake)
     args.tensorboard_log += '_' + str(teacher_cfg.teacher.params.eps_skip)
@@ -98,6 +102,11 @@ if __name__ == "__main__":
     args.tensorboard_log += '_act' + str(args.re_act)
     args.tensorboard_log += '_inter' + str(args.re_num_interaction)
     args.tensorboard_log += '_type' + str(args.re_feed_type)
+    args.tensorboard_log += '_teacherselect' + str(args.re_teacher_select)
+    args.tensorboard_log += '_statemask' + str(args.re_state_mask)
+    args.tensorboard_log += '_weightdecay' + str(args.re_weight_decay)
+    args.tensorboard_log += '_dist' + str(args.re_dist)
+    args.tensorboard_log += '_tok' + str(args.re_topk)
     args.tensorboard_log += '_large' + str(args.re_large_batch)
     args.tensorboard_log += '_rebatch' + str(args.re_batch)
     args.tensorboard_log += '_reupdate' + str(args.re_update)
@@ -137,19 +146,6 @@ if __name__ == "__main__":
             n_envs=args.n_envs, 
             monitor_dir=args.tensorboard_log,
             seed=args.seed)
-            
-    # instantiating the reward model
-    reward_model = RewardModel(
-        env.envs[0].observation_space.shape[0],
-        env.envs[0].action_space.shape[0],
-        size_segment=args.re_segment,
-        activation=args.re_act, 
-        lr=args.re_lr,
-        mb_size=args.re_batch,
-        large_batch=args.re_large_batch,
-        teacher_selection=args.re_teacher_select,
-        state_mask=args.re_state_mask)
-    
     if args.normalize == 1:
         env = VecNormalize(env, norm_reward=False)
     
@@ -158,6 +154,22 @@ if __name__ == "__main__":
     teacher_cfg.teacher.params.da = env.action_space.shape[0]
     teachers = hydra.utils.instantiate(teacher_cfg.teacher)
     teachers.set_env(env)
+            
+    # instantiating the reward model
+    reward_model = RewardModel(
+        env.envs[0].observation_space.shape[0],
+        env.envs[0].action_space.shape[0],
+        n_teachers=len(teachers.teachers),
+        size_segment=args.re_segment,
+        activation=args.re_act, 
+        lr=args.re_lr,
+        mb_size=args.re_batch,
+        large_batch=args.re_large_batch,
+        teacher_selection=args.re_teacher_select,
+        state_mask=args.re_state_mask,
+        dist=args.re_dist,
+        topk_prox=args.re_topk_prox,
+    )
     
     # network arch
     net_arch = [dict(pi=[args.hidden_dim]*args.num_layer, 
