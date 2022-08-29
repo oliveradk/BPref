@@ -102,11 +102,6 @@ if __name__ == "__main__":
     args.tensorboard_log += '_act' + str(args.re_act)
     args.tensorboard_log += '_inter' + str(args.re_num_interaction)
     args.tensorboard_log += '_type' + str(args.re_feed_type)
-    args.tensorboard_log += '_teacherselect' + str(args.re_teacher_select)
-    args.tensorboard_log += '_statemask' + str(args.re_state_mask)
-    args.tensorboard_log += '_weightdecay' + str(args.re_weight_decay)
-    args.tensorboard_log += '_dist' + str(args.re_dist)
-    args.tensorboard_log += '_tok' + str(args.re_topk)
     args.tensorboard_log += '_large' + str(args.re_large_batch)
     args.tensorboard_log += '_rebatch' + str(args.re_batch)
     args.tensorboard_log += '_reupdate' + str(args.re_update)
@@ -124,6 +119,11 @@ if __name__ == "__main__":
     args.tensorboard_log += '_unsuper_' + str(args.unsuper_step)
     args.tensorboard_log += '_update_' + str(args.unsuper_n_epochs)
     args.tensorboard_log += '_seed_' + str(args.seed) 
+    args.tensorboard_log += '/teacherselect' + str(args.re_teacher_select)
+    args.tensorboard_log += '_statemask' + str(args.re_state_mask)
+    args.tensorboard_log += '_weightdecay' + str(args.re_weight_decay)
+    args.tensorboard_log += '_dist' + str(args.re_dist)
+    args.tensorboard_log += '_topk' + str(args.re_topk)
     
     # extra params
     if args.use_sde == 0:
@@ -168,7 +168,7 @@ if __name__ == "__main__":
         teacher_selection=args.re_teacher_select,
         state_mask=args.re_state_mask,
         dist=args.re_dist,
-        topk_prox=args.re_topk_prox,
+        topk=args.re_topk,
     )
     
     # network arch
