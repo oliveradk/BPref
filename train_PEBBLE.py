@@ -200,7 +200,7 @@ class Workspace(object):
             )
 
         teacher_ids, teacher_info = self.reward_model.select_teachers(
-            self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2
+            self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, self.total_feedback,
         )
 
         (
@@ -293,8 +293,8 @@ class Workspace(object):
                 self.logger.log("train/r_diff_max", np.max(self.r_diffs), self.step)
                 self.logger.log("train/r_diff_min", np.min(self.r_diffs), self.step)
 
-                if self.reward_model.teacher_selection == 'prox_const':
-                    if len(self.teacher_info) == 0:
+                if 'prox' in self.reward_model.teacher_selection:
+                    if len(self.teacher_info) == 0 or ('is_max_beta' not in self.teacher_info[0]):
                         max_beta_acc = 0
                     else:
                         max_beta_acc = np.array(

@@ -102,7 +102,8 @@ class RewardModel:
         teacher_selection='uniform', 
         state_mask=None, 
         dist='mean', 
-        topk=-1
+        topk=-1,
+        teach_select_buffer=True,
     ):
         
         # train data is trajectories, must process to sa and s..   
@@ -655,7 +656,7 @@ class RewardModel:
         
         return ensemble_acc
     
-    def select_teachers(self, teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2):
+    def select_teachers(self, teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, total_feedback):
         batch_size = sa_t_1.shape[0]
         teacher_ids = np.empty((batch_size, 1), dtype=np.int8)
         infos = []
@@ -664,18 +665,23 @@ class RewardModel:
             sa_i_2 = sa_t_2[i]
             info_i_1 = info_t_1[i]
             info_i_2 = info_t_2[i]
-            teacher_id, info = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2)
+            teacher_id, info = self.select_teacher(teachers, sa_i_1, sa_i_2, info_i_1, info_i_2, total_feedback)
             teacher_ids[i] = teacher_id
             infos.append(info)
         return teacher_ids, infos
     
-    def select_teacher(self, teachers, sa_1, sa_2, info_1, info_2):
+    def select_teacher(self, teachers, sa_1, sa_2, info_1, info_2, total_feedback):
         if self.teacher_selection == 'uniform':
             return self.uniform_selection(teachers, sa_1, sa_2, info_1, info_2)
         elif self.teacher_selection == 'max_beta':
             return self.max_beta_selection(teachers, sa_1, sa_2, info_1, info_2)
-        elif self.teacher_selection == 'prox_const':
-            return self.proximity_consistency_selection(teachers, sa_1, sa_2, info_1, info_2)
+        elif 'prox' in self.teacher_selection:
+            if total_feedback < self.topk:
+                return self.uniform_selection(teachers, sa_1, sa_2, info_1, info_2)
+            elif self.teacher_selection == 'prox_const':
+                return self.proximity_consistency_selection(teachers, sa_1, sa_2, info_1, info_2)
+            elif self.teacher_selection == 'prox_diff':
+                return self.proximity_reward_diff_selection(teachers, sa_1, sa_2, info_1, info_2)
         else: 
             raise NotImplementedError
     
@@ -691,32 +697,7 @@ class RewardModel:
     
 
     def proximity_consistency_selection(self, teachers, sa_1, sa_2, info_1, info_2):
-        # compute distance from average value on dimension(s) of variation for sa_1, sa_2 for all queries in buffer
-        mean_1 = sa_1[:, self.state_mask].mean(axis=0)
-        mean_2 = sa_2[:, self.state_mask].mean(axis=0)
-        assert mean_1.shape == (len(self.state_mask),)
-
-        mean_seg_1 = self.buffer_seg1[:self.buffer_index, :, self.state_mask].mean(axis=1)
-        mean_seg_2 = self.buffer_seg2[:self.buffer_index, :, self.state_mask].mean(axis=1)
-        assert mean_seg_1.shape == (self.buffer_index, len(self.state_mask))
-        
-        dist_1 = np.linalg.norm(
-            np.concatenate([mean_seg_1, mean_seg_2], axis=1) - np.concatenate([mean_1, mean_2]), 
-            axis=1,
-        )
-        dist_2 = np.linalg.norm(
-            np.concatenate([mean_seg_1, mean_seg_2], axis=1) - np.concatenate([mean_2, mean_1]),
-            axis=1,
-        )
-        assert dist_1.shape == (self.buffer_index,)
-
-        dist = np.min(np.stack([dist_1, dist_2], axis=1), axis=1)
-        assert dist.shape == (self.buffer_index,)
-        # if self.buffer_index > 0:
-        #     import ipdb; ipdb.set_trace()
-        # get topk (where k is hyperparameter)
-        topk_query_idxs = np.argsort(dist)[:min(self.topk, self.buffer_index)]
-        
+        topk_query_idxs = self.get_topk_closest_queries(sa_1, sa_2, info_1, info_2)
         # label queries using current reward model
         with torch.no_grad():
             r_t_1 = self.r_hat_batch(self.buffer_seg1[topk_query_idxs])
@@ -739,42 +720,59 @@ class RewardModel:
         
         return const_teacher, {'is_max_beta': is_max_beta}
     
-    # def k_nearest_selection(self, teachers, sa_1, sa_2, info_1, info_2, k=50):
-    #     #TODO: rename to region regret
-    #     #get top k closest queries according to relevant dimension
+    def proximity_reward_diff_selection(self, teachers, sa_1, sa_2, info_1, info_2):
+        topk_query_idxs = self.get_topk_closest_queries(sa_1, sa_2, info_1, info_2)
+        # label queries using current reward model
+        with torch.no_grad():
+            r_t_1 = self.r_hat_batch(self.buffer_seg1[topk_query_idxs])
+            r_t_2 = self.r_hat_batch(self.buffer_seg2[topk_query_idxs])
+        sum_r_t_1 = r_t_1.sum(axis=1)
+        sum_r_t_2 = r_t_2.sum(axis=1)
+        r_diffs = np.abs(sum_r_t_1 - sum_r_t_2)
+        assert r_diffs.shape == (sum_r_t_1.shape[0], 1)
 
-    #     #for each query 
-    #         #get current r_hat value
-    #     #fore each teacher
-    #         #count number of labels now regarded as mistakes by reward model (maybe log this)
-            
-    #     #NOTE: possible problems: no memory (I think buffer is big enough though)
-    #     #NOTE: could try ignoring queries from first training 
+        r_diff_means = []
+        for teacher_id in range(self.n_teachers):
+            teach_query_idxs = self.buffer_teacher[topk_query_idxs] == teacher_id
+            r_diff_mean_teach = np.mean(r_diffs[teach_query_idxs])
+            r_diff_means.append(r_diff_mean_teach)
+        selected_teacher = np.argmax(r_diff_means)
         
-    #     #find nearest according to relevant dimension
-
-    #     #
-    #     pass
-    #     # temp_sa_1 = sa_1[:, :self.ds]
-    #     # temp_sa_2 = sa_2[:, :self.ds]
-
-    #     # temp_sa = np.concatenate([temp_sa_1.flatten()[None,],
-    #     #                          temp_sa_2.flatten()[None,]], axis=1)
-
-    #     # max_len = self.capacity if self.buffer_full else self.buffer_index
-
-    #     # tot_sa_1 = self.buffer_seg1[:max_len, :, :self.ds]
-    #     # tot_sa_2 = self.buffer_seg2[:max_len, :, :self.ds]
-    #     # labels = self.buffer_label[:max_len]
-    #     # teachers = self.buffer_teacher[:max_len]
-    #     # tot_sa = np.concatenate([tot_sa_1.reshape(max_len, -1),
-    #     #                          tot_sa_2.reshape(max_len, -1)])
+        max_beta_teacher, _info = self.max_beta_selection(teachers, sa_1, sa_2, info_1, info_2)
+        is_max_beta = selected_teacher == max_beta_teacher
         
-    #     # #for each teacher
-    #     #     # filter for trajectories labeled by teacher
-    #     #     # get top k closest queries (deal with symmetry)
-    #     # for teacher in teachers:
-    #     #     dists = np.linalg.norm() #TODO 
+        return selected_teacher, {'is_max_beta': is_max_beta}
+    
+    def get_topk_closest_queries(self, sa_1, sa_2, info_1, info_2):
+        if self.buffer_index >= self.mb_size:
+            index = self.buffer_index - self.mb_size
+        else:
+            index = self.buffer_index
+        
+        mean_1 = sa_1[:, self.state_mask].mean(axis=0)
+        mean_2 = sa_2[:, self.state_mask].mean(axis=0)
+        assert mean_1.shape == (len(self.state_mask),)
+
+        mean_seg_1 = self.buffer_seg1[:index, :, self.state_mask].mean(axis=1)
+        mean_seg_2 = self.buffer_seg2[:index, :, self.state_mask].mean(axis=1)
+        assert mean_seg_1.shape == (index, len(self.state_mask))
+        
+        dist_1 = np.linalg.norm(
+            np.concatenate([mean_seg_1, mean_seg_2], axis=1) - np.concatenate([mean_1, mean_2]), 
+            axis=1,
+        )
+        dist_2 = np.linalg.norm(
+            np.concatenate([mean_seg_1, mean_seg_2], axis=1) - np.concatenate([mean_2, mean_1]),
+            axis=1,
+        )
+        assert dist_1.shape == (index,)
+
+        dist = np.min(np.stack([dist_1, dist_2], axis=1), axis=1)
+        assert dist.shape == (index,)
+        # get topk (where k is hyperparameter)
+        topk_query_idxs = np.argsort(dist)[:min(self.topk, index)]
+        
+        return topk_query_idxs
         
         
 

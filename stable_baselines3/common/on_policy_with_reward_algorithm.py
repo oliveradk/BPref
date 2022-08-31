@@ -200,8 +200,8 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = queries
 
         teacher_ids, teacher_info = self.reward_model.select_teachers(
-            self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, 
-            info_t_2)
+            self.teachers.teachers, sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2, 
+            self.total_feed)
 
         # get labels
         sa_t_1, sa_t_2, r_t_1, r_t_2, labels, teacher_ids, betas = \
