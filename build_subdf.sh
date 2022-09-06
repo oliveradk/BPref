@@ -1,1 +1,1 @@
-python build_df.py --root_dir "exp/gaussian_beta/metaworld_button-press-v2/H256_L3_lr0.0003" --root_filter gaussian_beta_filter --filter_funcs n_teacher_filter seed_filter teacher_sampling_filter --build_subdfs --procs 5 --full_df_name gaussian_beta_df
+python build_df.py --root_dir "exp/default/cartpole_balance" --root_filter four_teachers --filter_funcs n_teacher_filter teacher_selection_filter query_sample_filter seed_filter --build_subdf --procs 5 --full_df_name cartpole_balance_4_df

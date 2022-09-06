@@ -55,7 +55,6 @@ def save_dfs(dfs, paths, f_name='event_df.pkl'):
         dfs[i].to_pickle(os.path.join(save_dir, f_name))
 
 def build_df(filter_funcs, events):
-    
     if len(filter_funcs) == 0:
         if len(events) != 1:
             raise ValueError("No filters for multiple events")
@@ -83,16 +82,43 @@ def teacher_str_param_filter(x, teacher_param):
     return re.search(f"(?<={teacher_param}': )'\w+'", x).group(0).replace("'", "")
 
 def n_teacher_filter(x):
-    return teacher_int_param_filter(x, 'n_teachers')
+    return str(int(n_experts_filter(x)) + int(n_generalists_filter(x)))
 
-def teacher_sampling_filter(x):
-    return teacher_str_param_filter(x, 'sampling')
+def n_experts_filter(x):
+    return teacher_int_param_filter(x, 'n_experts')
+
+def n_generalists_filter(x):
+    return teacher_int_param_filter(x, 'n_generalists')
+
+
+def teacher_selection_filter(x):
+    return re.search("(?<=teacher_selection).*(?=_state)", x).group(0)
+
+def query_sample_filter(x):
+    return re.search("(?<=sample).*(?=_teacher_selection)", x).group(0)
 
 def seed_filter(x):
     return re.search("(?<=seed)\d+", x).group(0)
 
 def gaussian_beta_filter(x):
-    return 'GaussianBetaTeachers' in x
+    return 'CartpoleXGaussianTeachers' in x
+
+def all_exps(x):
+    return True
+
+def four_teachers(x):
+    re_query = re.search(f"(?<=n_experts': )\d+", x)
+    if re_query is None:
+        return False
+    return re_query.group(0) == "4"
+
+def sample_1_filter(x):
+    re_query = re.search("(?<=sample).*(?=_teacher_selection)", x)
+    if re_query is None:
+        return False
+    else:
+        return re_query.group(0) == "1"
+
 
 
 def get_events_in_matching(root_dir, filter):
