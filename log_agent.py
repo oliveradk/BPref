@@ -30,10 +30,13 @@ def log_agent(exp_path, steps, log_dir, episodes, log_obs):
     agent.load(model_dir=exp_path, step=steps)
 
     #load teachers
-    cfg.teacher.params.ds = env.observation_space.shape[0]
-    cfg.teacher.params.da = env.action_space.shape[0]
-    teachers = hydra.utils.instantiate(cfg.teacher)
-    teachers.set_env(env, log_dir)
+    if cfg.teacher is not None:
+        cfg.teacher.params.ds = env.observation_space.shape[0]
+        cfg.teacher.params.da = env.action_space.shape[0]
+        teachers = hydra.utils.instantiate(cfg.teacher)
+        teachers.set_env(env, log_dir)
+    else:
+        teachers = None
     
     for episode in range(episodes):
         utils.log_episode(env=env,
