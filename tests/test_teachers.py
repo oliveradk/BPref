@@ -12,23 +12,8 @@ from teacher.kernel.gaussian import (
     GaussianTeacher,
     GaussianThreshTeacher,
 )
-from teacher.acrobot import (
-    AcrobotXUpperGaussian,
-    AcrobotYUpperGaussian,
-    AcrobotXYUpperGaussian,
-    AcrobotXUpperGaussianTeachers,
-    AcrobotYUpperGaussianTeachers,
-)
-from teacher.point_mass import (
-    PointMassXGaussian, 
-    PointMassYGaussian,
-    PointMassXYGaussian,
-    PointMassXGaussianTeachers,
-    PointMassYGaussianTeachers,
-    PointMassXYGaussianTeachers,
-    QUADRANT_CENTROIDS,
-)
-from teacher.cartpole import CartpoleXGaussian, CartpoleXGaussianTeachers
+from teacher.cartpole import CartpoleXGaussian, CartpoleXGaussianTeachers, X_INDEX_CARTPOLE
+from teacher.walker import WalkerYGaussian, WalkerYGaussianTeachers, Y_INDEX_WALKER
 from teacher.metaworld_reward import GraspInPlaceGaussian, GraspInPlaceTeachers
 
 from tests import TEST_CONFIGS, TEST_OBJS, PATH
@@ -233,111 +218,22 @@ class TestGaussianTeachers:
         assert np.isclose(gaus_thresh_teacher.kernel(np.array([1, 2, 1])), 4)
         assert np.isclose(gaus_thresh_teacher.kernel(np.array([0, 0, 0])), 0.2)
 
-
-class TestPointMassTeachers:
-    CFG = get_config("point_mass.yaml")
+class TestWalkerTeachers:
+    CFG = get_config("walker.yaml")
     ENV = utils.make_env(CFG)
 
-    def test_point_mass_x_gaussian(self):
-        thresh_gaus_teacher_test(PointMassXGaussian, env=self.ENV, dim=0)
+    sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = get_query("walker_walk")
 
-    def test_point_mass_y_gaussian(self):
-        thresh_gaus_teacher_test(PointMassYGaussian, env=self.ENV, dim=1)
-    
-    def test_point_mass_x_y_gaussian(self):
-        pass
-    
-    def test_point_mass_x_teachers(self):
-        thresh_gaus_teachers_test(
-            PointMassXGaussianTeachers, 
+    def test_walker_gaussian(self):
+        thresh_gaus_teacher_test(WalkerYGaussian, env=self.ENV, dim=Y_INDEX_WALKER)
+
+    def test_walker_y_teachers(self):
+        thresh_gaus_teachers_test(#TODO: adjust with new range
+            WalkerYGaussianTeachers,
             self.ENV,
-            centroids=[-0.225, -0.075, 0.075, 0.225],
-            edges=[-0.3, -0.15, 0, 0.15],
-            dim=0,
-        )
-    
-    def test_point_mass_y_teachers(self):
-        thresh_gaus_teachers_test(
-            PointMassYGaussianTeachers,
-            self.ENV,
-            centroids=[-0.225, -0.075, 0.075, 0.225],
-            edges = [-0.3, -0.15, 0, 0.15],
-            dim=1
-        )
-    
-    def test_point_mass_x_y_teachers(self):
-        teachers = PointMassXYGaussianTeachers(
-            ds=self.ENV.observation_space.shape[0],
-            da=self.ENV.action_space.shape[0],
-            n_generalists=0,
-            gamma=1,
-            eps_mistake=0,
-            eps_skip=0,
-            eps_equal=0,
-            beta_general=1,
-            scale=2,
-            thresh_val=0.1
-        )
-        centroids = [[-0.15, -0.15], [-0.15, 0.15], [0.15, -0.15], [0.15, 0.15]]
-        edges = [[-0.3, -0.3], [0, 0.3], [0.3, -0.3], [0, 0]]
-        # kernel
-        betas_cent = [
-            teachers.teachers[i].kernel(np.concatenate([centroids[i], centroids[i]]))
-            for i in range(4)
-        ]
-        betas_edge = [
-            teachers.teachers[i].kernel(np.concatenate([edges[i], edges[i]])) for i in range(4)
-        ]
-        assert np.allclose(np.array(betas_cent), np.ones(4) * 2)
-        assert np.allclose(np.array(betas_edge), np.ones(4) * 0.1)
-
-        # betas
-        index = [0,1]
-        sa_1 = np.ones((50, self.ENV.observation_space.shape[0]))
-        sa_2 = np.ones((50, self.ENV.observation_space.shape[0]))
-        sa_1[:, index] = np.array(centroids[0])
-        sa_2[:, index] = np.array(centroids[0])
-        beta = teachers.teachers[0].get_beta(sa_1, sa_2, None, None)
-        assert np.isclose(beta, 2)
-
-        sa_1 = np.ones((50, self.ENV.observation_space.shape[0]))
-        sa_2 = np.ones((50, self.ENV.observation_space.shape[0]))
-        sa_1[:, index] = np.array(edges[-1])
-        sa_2[:, index] = np.array(edges[-1])
-        beta = teachers.teachers[-1].get_beta(sa_1, sa_2, None, None)
-        assert np.isclose(beta, 0.1)
-
-class TestAcrobotTeachers:
-    CFG = get_config("acrobot.yaml")
-    ENV = utils.make_env(CFG)
-
-    sa_t_1, sa_t_2, r_t_1, r_t_2, info_t_1, info_t_2 = get_query("acrobot_swingup")
-
-    def test_acrobot_x_upper_gaussian(self):
-        thresh_gaus_teacher_test(AcrobotXUpperGaussian, env=self.ENV, dim=0)
-
-    def test_acrobot_y_upper_gaussian(self):
-        thresh_gaus_teacher_test(AcrobotYUpperGaussian, env=self.ENV, dim=2)
-
-    def test_acrobot_xy_upper_gaussian(self):
-        pass
-
-    def test_acrobot_x_upper_teachers(self):
-        thresh_gaus_teachers_test(
-            AcrobotXUpperGaussianTeachers,
-            self.ENV,
-            centroids=[-0.75, -0.25, 0.25, 0.75],
-            edges=[-1, -0.5, 0, 0.5],
-            dim=0,
-        )
-
-    def test_acrobot_y_upper_teachers(self):
-        thresh_gaus_teachers_test(
-            AcrobotYUpperGaussianTeachers,
-            self.ENV,
-            centroids=[-0.75, -0.25, 0.25, 0.75],
-            edges=[-1, -0.5, 0, 0.5],
-            dim=2,
+            centroids=[0.225, .675, 1.125, 1.575],
+            edges=[0, 0.45, .9, 1.35],
+            dim=Y_INDEX_WALKER,
         )
 
 

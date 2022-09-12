@@ -2,24 +2,24 @@ import numpy as np
 
 from .kernel.gaussian import GaussianThreshTeacher, Gaussian1DThreshTeachers
 
-X_RANGE_CARTPOLE = [-1.8, 1.8]
-X_INDEX_CARTPOLE = 0
+Y_RANGE_WALKER = [0, 1.8] #TODO: change
+Y_INDEX_WALKER = 14
 
 
-class CartpoleXGaussian(GaussianThreshTeacher):
+class WalkerYGaussian(GaussianThreshTeacher):
     def get_point(self, sa_1, sa_2, info_1, info_2):
-        x_1 = sa_1[:, X_INDEX_CARTPOLE]
-        x_2 = sa_2[:, X_INDEX_CARTPOLE]
+        x_1 = sa_1[:, Y_INDEX_WALKER]
+        x_2 = sa_2[:, Y_INDEX_WALKER]
         x = np.stack([x_1, x_2], axis=1)
         assert x.shape == (sa_1.shape[0], 2)
         return x
 
 
-class CartpoleXGaussianTeachers(Gaussian1DThreshTeachers):
+class WalkerYGaussianTeachers(Gaussian1DThreshTeachers):
     @property
     def bounds(self):
-        return X_RANGE_CARTPOLE
+        return Y_RANGE_WALKER
 
     @property
     def expert_type(self):
-        return CartpoleXGaussian
+        return WalkerYGaussian

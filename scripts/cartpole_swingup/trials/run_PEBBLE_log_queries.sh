@@ -1,1 +1,0 @@
-python train_PEBBLE.py hydra.exp_name=cartpole_trials env=cartpole_swingup ground_truth=True seed=12345 agent.params.actor_lr=0.005 agent.params.critic_lr=0.005 gradient_update=1 activation=tanh num_unsup_steps=9000 num_train_steps=250000 num_interact=5000 max_feedback=2000 reward_batch=50 reward_update=0 feed_type=1

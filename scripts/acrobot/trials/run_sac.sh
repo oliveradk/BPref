@@ -1,1 +1,0 @@
-python train_SAC.py env=acrobot_swingup hydra.exp_name=acrobot_trials seed=12345 agent.params.actor_lr=0.0005 agent.params.critic_lr=0.0005 num_train_steps=100000 num_unsup_steps=9000

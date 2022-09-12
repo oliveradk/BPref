@@ -16,13 +16,13 @@ def test_pebble_cartpole_gaussian_sim_querries():
     exit_code = run_script("run_PEBBLE_cartpole_gaussian_sim_querries.sh")
     assert exit_code == 0
 
-def test_pebble_acrobot_gaussian_log_queries():
-    exit_code = run_script("run_PEBBLE_acrobot_gaussian_log_queries.sh")
+def test_pebble_walker_gaussian_log_queries():
+    exit_code = run_script("run_PEBBLE_walker_gaussian_log_queries.sh")
     assert exit_code == 0
 
 
-def test_pebble_acrobot_gaussian_sim_dis_queries():
-    exit_code = run_script("run_PEBBLE_acrobot_gaussian_sim_dis_queries.sh")
+def test_pebble_walker_gaussian_sim_dis_queries():
+    exit_code = run_script("run_PEBBLE_walker_gaussian_sim_dis_queries.sh")
     assert exit_code == 0
 
 
@@ -37,8 +37,8 @@ def test_ppo_button_press_grasp_inplace_gaussian():
     assert exit_code == 0
 
 
-def test_pebble_acrobot_ygaussian_max_beta():
-    exit_code = run_script("run_PEBBLE_acrobot_y_gaussian_max_beta.sh")
+def test_pebble_walker_gaussian_max_beta():
+    exit_code = run_script("run_PEBBLE_walker_gaussian_max_beta.sh")
     assert exit_code == 0
 
 

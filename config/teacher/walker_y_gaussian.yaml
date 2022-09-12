@@ -1,0 +1,15 @@
+teacher:
+  name: walker_y_gaussian
+  class: teacher.walker.WalkerYGaussianTeachers
+  params:
+    n_experts: 2
+    n_generalists: 0
+    ds: ???
+    da: ???
+    gamma: 1
+    eps_mistake: 0
+    eps_skip: 0
+    eps_equal: 0
+    beta_general: 1
+    scale: 1
+    thresh_val: 0.1
