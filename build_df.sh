@@ -1,1 +1,2 @@
 python build_df.py --root_dir "exp/default/cartpole_balance" --root_filter four_teachers --filter_funcs n_teacher_filter teacher_selection_filter query_sample_filter seed_filter --build_df --procs 5 --full_df_name cartpole_balance_4_df
+python build_df.py --root_dir "exp/default/walker_walk" --root_filter four_teachers --filter_funcs n_teacher_filter teacher_selection_filter query_sample_filter seed_filter --build_df --procs 5 --full_df_name walker_walk_4_df
