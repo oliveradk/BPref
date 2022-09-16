@@ -1,4 +1,4 @@
-# B-Pref
+# Deep Reinforcement Learning from Expert Feedback
 
 Official codebase for Deep Reinforcement from Expert Feedback, forked from [B-Pref: Benchmarking Preference-BasedReinforcement Learning](https://openreview.net/forum?id=ps95-mkHF_) contains scripts to reproduce experiments.
 
