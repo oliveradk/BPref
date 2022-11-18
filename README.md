@@ -2,7 +2,7 @@
 
 This is code for [The Expertise Problem: Learning from Specialized Feedback](https://arxiv.org/abs/2211.06519). If you use it, please cite:
 
-Oliver Daniels-Koch, Rachel Freedman. “The Expertise Problem: Learning from Specialized Feedback.” In ML Safety Workshop at NeurIPS 2022.
+Oliver Daniels-Koch, Rachel Freedman. “The Expertise Problem: Learning from Specialized Feedback.” In _ML Safety Workshop at NeurIPS 2022_.
 
 
 ## Install
