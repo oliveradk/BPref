@@ -1,6 +1,8 @@
-# Deep Reinforcement Learning from Expert Feedback
+# Deep Reinforcement Learning from Specialized Feedback
 
-Official codebase for Deep Reinforcement from Expert Feedback, forked from [B-Pref: Benchmarking Preference-BasedReinforcement Learning](https://openreview.net/forum?id=ps95-mkHF_) contains scripts to reproduce experiments.
+This is code for [The Expertise Problem: Learning from Specialized Feedback](https://arxiv.org/abs/2211.06519). If you use it, please cite:
+
+Oliver Daniels-Koch, Rachel Freedman. “The Expertise Problem: Learning from Specialized Feedback.” In ML Safety Workshop at NeurIPS 2022.
 
 
 ## Install
